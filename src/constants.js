@@ -55,7 +55,12 @@ const NOTIFY_CHANNELS = { whatsapp: 'WhatsApp', sms: 'SMS', none: 'No messages' 
 
 const FIELD_TYPES = { text: 'Text', number: 'Number', date: 'Date', yesno: 'Yes / No', select: 'Choice list' };
 
+const TIMESHEET_STATUS = { submitted: 'Waiting for admin check', confirmed: 'Confirmed', rejected: 'Needs correction' };
+const PAYMENT_METHODS = { bank: 'Bank transfer', cash: 'Cash' };
+const PAYMENT_STATUS = { pending: 'Payment pending', paid: 'Paid' };
+
 module.exports = {
   CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES,
   KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
+  TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS,
 };

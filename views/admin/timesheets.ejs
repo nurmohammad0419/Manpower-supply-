@@ -1,0 +1,8 @@
+<%- include('../partials/header') %>
+<h1><%= t('Timesheets') %></h1>
+<div class="tabs">
+  <a href="?" class="<%= !filter ? 'active' : '' %>"><%= t('All') %></a>
+  <% Object.entries(TIMESHEET_STATUS).forEach(([k, v]) => { %><a href="?status=<%= k %>" class="<%= filter === k ? 'active' : '' %>"><%= t(v) %></a><% }) %>
+</div>
+<%- include('../partials/timesheet-table', { linkBase: '/admin/timesheets/', showCompany: true }) %>
+<%- include('../partials/footer') %>

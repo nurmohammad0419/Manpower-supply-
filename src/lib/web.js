@@ -249,18 +249,33 @@ function parseMultipart(buf, boundary) {
 }
 
 // Check real file contents, not only the browser-reported type.
-function sniffMime(b) {
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const XLS = 'application/vnd.ms-excel';
+
+function sniffMime(b, filename = '') {
+  const ext = path.extname(filename).toLowerCase();
   if (b.length >= 4 && b.slice(0, 4).toString('latin1') === '%PDF') return 'application/pdf';
   if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
   if (b.length >= 8 && b.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
   if (b.length >= 12 && b.slice(0, 4).toString('latin1') === 'RIFF' && b.slice(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  // Excel files are only recognised when both the contents and the file name match.
+  if (ext === '.xlsx' && b.length >= 4 && b.slice(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) return XLSX;
+  if (ext === '.xls' && b.length >= 8 && b.slice(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]))) return XLS;
+  if (ext === '.csv' && !b.slice(0, 8192).includes(0)) return 'text/csv';
   return null;
 }
 
-const EXT = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+const EXT = {
+  'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
+  [XLSX]: '.xlsx', [XLS]: '.xls', 'text/csv': '.csv',
+};
+const DOCUMENT_MIMES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
-// upload({ dir, maxFileSize, allowedFields, allowedMimes }) → middleware filling req.body and req.files
-function upload({ dir, maxFileSize, maxFiles, allowedFields, allowedMimes = Object.keys(EXT) }) {
+// upload({ dir, maxFileSize, allowedFields, allowedMimes, typeError }) → middleware filling req.body and req.files
+function upload({
+  dir, maxFileSize, maxFiles, allowedFields, allowedMimes = DOCUMENT_MIMES,
+  typeError = '"{file}" is not a PDF, JPG, PNG or WEBP file.',
+}) {
   return async (req, res, next) => {
     if (req.method !== 'POST' || !req.is('multipart/form-data')) return next();
     const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(req.headers['content-type'] || '');
@@ -274,9 +289,8 @@ function upload({ dir, maxFileSize, maxFiles, allowedFields, allowedMimes = Obje
         if (!p.filename || !p.content.length) continue; // empty file input
         if (!allowedFields.includes(p.name)) continue;
         if (p.content.length > maxFileSize) throw Object.assign(new Error('File is too large. Maximum size is {mb} MB.'), { userError: true, params: { mb: Math.round(maxFileSize / 1048576) } });
-        const mime = sniffMime(p.content);
-        if (!mime) throw Object.assign(new Error('"{file}" is not a PDF, JPG, PNG or WEBP file.'), { userError: true, params: { file: path.basename(p.filename) } });
-        if (!allowedMimes.includes(mime)) throw Object.assign(new Error('"{file}" must be a JPG, PNG or WEBP image.'), { userError: true, params: { file: path.basename(p.filename) } });
+        const mime = sniffMime(p.content, p.filename);
+        if (!mime || !allowedMimes.includes(mime)) throw Object.assign(new Error(typeError), { userError: true, params: { file: path.basename(p.filename) } });
         (files[p.name] ||= []).push({ originalname: path.basename(p.filename).slice(0, 200), mimetype: mime, content: p.content });
       }
       // Only write files once the whole request is valid.
@@ -299,4 +313,4 @@ function upload({ dir, maxFileSize, maxFiles, allowedFields, allowedMimes = Obje
   };
 }
 
-module.exports = { createApp, serveStatic, urlencoded, sessions, upload };
+module.exports = { createApp, serveStatic, urlencoded, sessions, upload, XLSX, XLS };

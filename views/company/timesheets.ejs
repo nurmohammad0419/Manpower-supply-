@@ -1,0 +1,21 @@
+<%- include('../partials/header') %>
+<h1><%= t('Timesheets') %></h1>
+<p class="muted"><%= t('At the end of each month, upload the timesheet of the workers you hired. The admin checks it, then each worker is told their hours, amount and payment status.') %></p>
+<div class="card">
+  <h2><%= t('Upload a new timesheet') %></h2>
+  <% if (!demands.length) { %>
+    <p class="muted"><%= t('You can upload timesheets after you hire workers on a demand.') %></p>
+  <% } else { %>
+  <form method="get" action="/company/timesheets/new" class="inline-form">
+    <label><%= t('Demand') %>
+      <select name="demand" required>
+        <% demands.forEach(d => { %><option value="<%= d.id %>"><%= d.title %> (<%= t('{n} hired', { n: d.hired_count }) %>)</option><% }) %>
+      </select>
+    </label>
+    <label><%= t('Month') %> <input type="month" name="month" required value="<%= new Date().toISOString().slice(0, 7) %>"></label>
+    <button class="btn"><%= t('Continue') %></button>
+  </form>
+  <% } %>
+</div>
+<%- include('../partials/timesheet-table', { linkBase: '/company/timesheets/' }) %>
+<%- include('../partials/footer') %>

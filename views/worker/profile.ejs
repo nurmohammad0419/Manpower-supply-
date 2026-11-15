@@ -32,6 +32,10 @@
         <label><%= t('Expected salary (SAR)') %> <input name="expected_salary" maxlength="100" value="<%= form.expected_salary || '' %>" placeholder="<%= t('e.g. 1800 per month') %>"></label>
         <label><%= t('Available from') %> <input type="date" name="available_from" value="<%= form.available_from || '' %>"></label>
       </div>
+      <div class="row2">
+        <label><%= t('Bank name') %> <input name="bank_name" maxlength="100" value="<%= form.bank_name || '' %>" placeholder="<%= t('e.g. Al Rajhi Bank') %>"></label>
+        <label><%= t('IBAN (for bank payments)') %> <input name="iban" maxlength="40" value="<%= form.iban || '' %>" placeholder="SA00 0000 0000 0000 0000 0000" dir="ltr"></label>
+      </div>
       <label><%= t('Work history') %>
         <textarea name="work_history" rows="4" maxlength="3000" placeholder="<%= t('e.g. 2019–2023 Electrician, Al Noor Contracting, Riyadh') %>"><%= form.work_history || '' %></textarea>
       </label>

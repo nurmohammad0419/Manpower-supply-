@@ -5,7 +5,7 @@
 //   WHATSAPP_PROVIDER = meta | twilio      SMS_PROVIDER = twilio
 // When no provider is configured, messages are only logged (status "not_sent").
 const db = require('./db');
-const { translator } = require('./i18n');
+const { translator, formatMonth } = require('./i18n');
 
 let fetchImpl = (...args) => fetch(...args);
 const TIMEOUT_MS = 15000;
@@ -85,12 +85,15 @@ const update = db.prepare('UPDATE notifications SET status = ?, error = ? WHERE 
 
 // Send a message to a user. `key` is the English message text (translated to the user's
 // language); `params` fill its {placeholders}; `link` is an optional site path.
+// A param may be { tr: 'English text' } (translated too) or { month: '2026-11' } (shown as a month name).
 // Returns a promise that never rejects; failures are recorded in the notifications table.
 async function notifyUser(userId, key, params = {}, link = '') {
   try {
     const user = db.prepare('SELECT id, phone, lang, notify_channel FROM users WHERE id = ?').get(userId);
     if (!user || !['whatsapp', 'sms'].includes(user.notify_channel)) return;
     const t = translator(user.lang);
+    params = Object.fromEntries(Object.entries(params).map(([k, v]) => [k,
+      v && typeof v === 'object' ? (v.tr ? t(v.tr) : formatMonth(v.month, user.lang)) : v]));
     let body = t(key, params);
     if (params.note) body += '\n' + t('Note from company: {note}', { note: params.note });
     if (link && process.env.BASE_URL) body += '\n' + process.env.BASE_URL.replace(/\/$/, '') + link;

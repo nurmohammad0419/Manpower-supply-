@@ -6,10 +6,12 @@ const web = require('./lib/web');
 const { hashPassword, verifyPassword } = require('./lib/password');
 const {
   CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES,
-  KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
+  KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES, TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS,
 } = require('./constants');
 const { notifyUser } = require('./notify');
-const { LANGUAGES, translator, pickLanguage } = require('./i18n');
+const {
+  LANGUAGES, translator, pickLanguage, formatMonth, formatMoney,
+} = require('./i18n');
 
 const app = web.createApp();
 const PORT = Number(process.env.PORT) || 3000;
@@ -69,8 +71,10 @@ app.use((req, res, next) => {
   res.locals.currentUrl = req.originalUrl;
   Object.assign(res.locals, {
     CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES, LANGUAGES,
-    KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
+    KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES, TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS,
   });
+  res.locals.fmtMonth = (ym) => formatMonth(ym, req.lang);
+  res.locals.money = formatMoney;
   const t = req.t;
   const lang = LANGUAGES[req.lang];
   Object.assign(res.locals, { t, lang: req.lang, dir: lang.dir });
@@ -130,7 +134,10 @@ function saveDocuments(workerId, files) {
 }
 
 const docFields = Object.keys(DOC_TYPES).map((k) => 'doc_' + k);
-const logoUpload = { dir: LOGO_DIR, maxFileSize: 2 * 1024 * 1024, maxFiles: 1, allowedMimes: ['image/jpeg', 'image/png', 'image/webp'] };
+const logoUpload = {
+  dir: LOGO_DIR, maxFileSize: 2 * 1024 * 1024, maxFiles: 1, allowedMimes: ['image/jpeg', 'image/png', 'image/webp'],
+  typeError: '"{file}" must be a JPG, PNG or WEBP image.',
+};
 const removeLogo = (file) => { if (file) fs.rm(path.join(LOGO_DIR, file), { force: true }, () => {}); };
 const notifyChannel = (v) => (NOTIFY_CHANNELS[v] ? v : 'whatsapp');
 
@@ -185,6 +192,7 @@ function workerExtraColumns(b) {
     driving_license: DRIVING_OPTIONS[b.driving_license] ? b.driving_license : '',
     expected_salary: str(b.expected_salary, 100), available_from: str(b.available_from, 10),
     work_history: str(b.work_history, 3000),
+    bank_name: str(b.bank_name, 100), iban: str(b.iban, 34).toUpperCase().replace(/\s+/g, ''),
   };
 }
 
@@ -573,7 +581,7 @@ app.post('/worker/profile', workerOnly, (req, res) => {
   }
   db.prepare(`UPDATE workers SET iqama_expiry=@iqama_expiry, passport_expiry=@passport_expiry, kafala_transfer=@kafala_transfer,
     languages=@languages, driving_license=@driving_license, expected_salary=@expected_salary, available_from=@available_from,
-    work_history=@work_history WHERE user_id=@id`).run({ ...workerExtraColumns(b), id: req.session.user.id });
+    work_history=@work_history, bank_name=@bank_name, iban=@iban WHERE user_id=@id`).run({ ...workerExtraColumns(b), id: req.session.user.id });
   saveCustomFields(req.session.user.id, custom.values);
   db.prepare(`UPDATE workers SET full_name=?, nationality=?, iqama_number=?, passport_number=?, profession=?, experience_years=?, skills=?, city=?, date_of_birth=? WHERE user_id=?`)
     .run(str(b.full_name, 200), str(b.nationality, 100), str(b.iqama_number, 30), str(b.passport_number, 30), str(b.profession, 100),
@@ -655,6 +663,7 @@ app.get('/admin', adminOnly, (req, res) => {
     demands: db.prepare("SELECT COUNT(*) n FROM demands WHERE status='open'").get().n,
     applications: db.prepare('SELECT COUNT(*) n FROM applications').get().n,
     hired: db.prepare("SELECT COUNT(*) n FROM applications WHERE status='hired'").get().n,
+    timesheets: db.prepare("SELECT COUNT(*) n FROM timesheets WHERE status='submitted'").get().n,
   };
   const companies = db.prepare(`SELECT c.*, u.email, u.phone, u.created_at,
     (SELECT COUNT(*) FROM demands d WHERE d.company_id = c.user_id) AS demand_count
@@ -727,6 +736,9 @@ app.post('/admin/fields/:id/delete', adminOnly, (req, res) => {
   flash(req, 'success', 'Field deleted.');
   res.redirect('/admin/fields');
 });
+
+// ---------- Timesheets & payments ----------
+require('./timesheets')(app, { db, flash, requireRole, handleUpload, checkCsrf, str, int, notifyUser, UPLOAD_DIR });
 
 // ---------- Errors ----------
 app.use((req, res) => res.status(404).render('error', { title: 'Not found', message: 'Page not found.' }));

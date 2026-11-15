@@ -19,13 +19,16 @@
         <% if (user.role === 'company') { %>
           <a href="/company" class="<%= path === '/company' ? 'active' : '' %>"><%= t('Dashboard') %></a>
           <a href="/company/demands/new"><%= t('+ Post Demand') %></a>
+          <a href="/company/timesheets" class="<%= path.startsWith('/company/timesheets') ? 'active' : '' %>"><%= t('Timesheets') %></a>
           <a href="/company/profile"><%= t('Profile') %></a>
         <% } else if (user.role === 'worker') { %>
           <a href="/worker" class="<%= path === '/worker' ? 'active' : '' %>"><%= t('My Applications') %></a>
           <a href="/worker/documents"><%= t('Documents') %></a>
+          <a href="/worker/payments" class="<%= path === '/worker/payments' ? 'active' : '' %>"><%= t('Payments') %></a>
           <a href="/worker/profile"><%= t('Profile') %></a>
         <% } else { %>
           <a href="/admin"><%= t('Admin') %></a>
+          <a href="/admin/timesheets" class="<%= path.startsWith('/admin/timesheets') ? 'active' : '' %>"><%= t('Timesheets') %></a>
         <% } %>
         <form method="post" action="/logout" class="inline">
           <input type="hidden" name="_csrf" value="<%= csrf %>">

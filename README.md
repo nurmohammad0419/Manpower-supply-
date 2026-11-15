@@ -28,9 +28,17 @@ Companies in Saudi Arabia post manpower demands online, workers browse them and 
 - **Worker profile fields**: add any extra question for workers (text, number, date, yes/no or a choice list; optional or required). It appears in the worker registration form and profile, and companies see the answers. Fields can be hidden or deleted later.
 - Log of every WhatsApp / SMS message and whether it was sent
 
+**Timesheets & payments (হাজিরা ও পেমেন্ট)**
+1. At month end the company uploads the timesheet file (PDF, Excel `.xlsx`/`.xls` or CSV) for a demand and enters, for each hired worker, days worked, hours and the amount in SAR (calculated from the rate, editable), plus the payment method: bank transfer or cash.
+2. The admin opens the file, compares it with the numbers and either confirms it or sends it back with a note. The company corrects and resubmits (the file can be kept or replaced).
+3. On confirmation each worker gets a WhatsApp / SMS: month, days, hours, amount, payment method and payment status. The company is told too.
+4. When the worker is paid, the company (or admin) marks it paid with the date, an optional reference and an optional receipt. The worker gets another message.
+5. Workers see all their months on the **Payments** page and can print a **payment slip** (with IBAN for bank payments) and open the receipt. Other workers and other companies cannot see them.
+
 **WhatsApp / SMS notifications**
 - Worker: when shortlisted, hired (with the company's note) or not selected
-- Company: when a worker applies, and when the admin approves the company
+- Company: when a worker applies, when the admin approves the company, and when a timesheet is confirmed or sent back
+- Worker: when a timesheet is confirmed (hours, amount, payment status) and when the payment is made
 - Messages are written in each person's chosen language. Everyone can choose WhatsApp, SMS or no messages in their profile.
 
 **Languages (ভাষা)**
@@ -97,6 +105,7 @@ src/db.js            SQLite schema and the first admin account
 src/constants.js     job categories, document types, cities
 src/i18n.js          language list and translation lookup
 src/notify.js        WhatsApp / SMS messages (Meta, Twilio)
+src/timesheets.js    monthly timesheets, admin check, payments, payment slips
 src/locales/*.json   translations (English text → translated text)
 src/lib/web.js       small built-in web framework (routing, sessions, uploads)
 src/lib/template.js  EJS-style templates

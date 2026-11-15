@@ -1,0 +1,32 @@
+<%- include('../partials/header') %>
+<h1><%= t('My payments') %></h1>
+<div class="stats stats-row">
+  <div class="stat"><b><%= totals.hours %></b><span><%= t('Hours') %></span></div>
+  <div class="stat"><b><%= money(totals.paid) %></b><span><%= t('Paid (SAR)') %></span></div>
+  <div class="stat"><b><%= money(totals.pending) %></b><span><%= t('Payment pending (SAR)') %></span></div>
+</div>
+<% if (!lines.length) { %>
+  <div class="card empty"><%= t('No confirmed timesheets yet. When your company uploads your timesheet and the admin confirms it, it appears here.') %></div>
+<% } else { %>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Month') %></th><th><%= t('Company') %></th><th><%= t('Days worked') %></th><th><%= t('Hours') %></th><th><%= t('Amount (SAR)') %></th><th><%= t('Payment') %></th><th></th></tr></thead>
+    <tbody>
+    <% lines.forEach(l => { %>
+      <tr>
+        <td class="nowrap"><b><%= fmtMonth(l.month) %></b></td>
+        <td><div class="company-line"><%- include('../partials/logo', { file: l.logo_file, size: 'sm' }) %><bdi><%= l.company_name %></bdi></div><div class="small muted"><bdi><%= l.demand_title %></bdi></div></td>
+        <td><%= l.days_worked %></td>
+        <td><%= l.hours %></td>
+        <td class="nowrap"><b><%= money(l.amount) %></b></td>
+        <td><%= t(PAYMENT_METHODS[l.payment_method]) %><br><%- include('../partials/pay-badge', { status: l.payment_status }) %>
+          <% if (l.paid_at) { %><div class="small muted"><%= fmtDate(l.paid_at) %></div><% } %></td>
+        <td class="nowrap small"><a href="/payslips/<%= l.id %>" target="_blank"><%= t('Payment slip') %></a>
+          <% if (l.proof_file) { %><br><a href="/timesheet-lines/<%= l.id %>/proof" target="_blank"><%= t('Receipt') %></a><% } %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+<%- include('../partials/footer') %>

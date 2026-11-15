@@ -140,6 +140,43 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 `);
 
+db.exec(`
+-- Monthly timesheet a company uploads for the workers it hired on one demand.
+CREATE TABLE IF NOT EXISTS timesheets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  company_id INTEGER NOT NULL REFERENCES companies(user_id) ON DELETE CASCADE,
+  demand_id INTEGER NOT NULL REFERENCES demands(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('bank','cash')),
+  status TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted','confirmed','rejected')),
+  admin_note TEXT,
+  submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+  reviewed_at TEXT,
+  UNIQUE (demand_id, month)
+);
+
+-- One worker's hours and pay in a timesheet.
+CREATE TABLE IF NOT EXISTS timesheet_lines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  timesheet_id INTEGER NOT NULL REFERENCES timesheets(id) ON DELETE CASCADE,
+  worker_id INTEGER NOT NULL REFERENCES workers(user_id) ON DELETE CASCADE,
+  days_worked INTEGER NOT NULL DEFAULT 0,
+  hours REAL NOT NULL DEFAULT 0,
+  amount REAL NOT NULL DEFAULT 0,
+  payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending','paid')),
+  paid_at TEXT,
+  payment_ref TEXT,
+  proof_file TEXT,
+  proof_name TEXT,
+  proof_mime TEXT,
+  UNIQUE (timesheet_id, worker_id)
+);
+CREATE INDEX IF NOT EXISTS idx_timesheet_lines_worker ON timesheet_lines(worker_id);
+`);
+
 // Add columns introduced after the first release (safe to run on every start).
 function addColumn(table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
@@ -156,6 +193,8 @@ addColumn('workers', 'driving_license', "TEXT NOT NULL DEFAULT ''");
 addColumn('workers', 'expected_salary', 'TEXT');
 addColumn('workers', 'available_from', 'TEXT');
 addColumn('workers', 'work_history', 'TEXT');
+addColumn('workers', 'bank_name', 'TEXT');
+addColumn('workers', 'iban', 'TEXT');
 
 // Seed an admin account on first run.
 const adminEmail = (process.env.ADMIN_EMAIL || 'admin@manpower.local').toLowerCase();

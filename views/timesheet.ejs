@@ -1,0 +1,76 @@
+<%- include('partials/header') %>
+<% const isAdmin = user.role === 'admin'; %>
+<div class="crumbs"><a href="<%= back %>"><span class="arr">←</span> <%= t('Timesheets') %></a></div>
+<div class="section-head">
+  <div>
+    <h1><%= t('Timesheet') %> — <%= fmtMonth(ts.month) %></h1>
+    <p class="muted company-line"><%- include('partials/logo', { file: ts.logo_file }) %><bdi><%= ts.company_name %></bdi> · <bdi><%= ts.demand_title %></bdi></p>
+  </div>
+  <div class="actions">
+    <%- include('partials/ts-badge', { status: ts.status }) %>
+    <a class="btn btn-alt" href="/timesheets/<%= ts.id %>/file" target="_blank"><%= t('Open uploaded file') %> (<bdi><%= ts.original_name %></bdi>)</a>
+    <% if (!isAdmin && ts.status !== 'confirmed') { %><a class="btn btn-alt" href="/company/timesheets/new?demand=<%= ts.demand_id %>&month=<%= ts.month %>"><%= t('Edit') %></a><% } %>
+  </div>
+</div>
+
+<% if (ts.status === 'rejected') { %><div class="alert alert-error"><b><%= t('The admin asked for a correction') %>:</b> <bdi><%= ts.admin_note %></bdi></div><% } %>
+<% if (ts.status === 'submitted' && !isAdmin) { %><div class="alert alert-warn"><%= t('Waiting for the admin to check this timesheet. Workers are informed after confirmation.') %></div><% } %>
+<% if (ts.status === 'confirmed' && ts.admin_note) { %><div class="alert alert-success"><%= t('Admin note') %>: <bdi><%= ts.admin_note %></bdi></div><% } %>
+
+<div class="stats stats-row">
+  <div class="stat"><b><%= lines.length %></b><span><%= t('Workers') %></span></div>
+  <div class="stat"><b><%= ts.total_hours %></b><span><%= t('Hours') %></span></div>
+  <div class="stat"><b><%= money(ts.total_amount) %></b><span><%= t('Amount (SAR)') %></span></div>
+  <div class="stat"><b><%= t(PAYMENT_METHODS[ts.payment_method]) %></b><span><%= t('Payment method') %></span></div>
+</div>
+
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Worker') %></th><th><%= t('Days worked') %></th><th><%= t('Hours') %></th><th><%= t('Amount (SAR)') %></th><th><%= t('Payment') %></th></tr></thead>
+    <tbody>
+    <% lines.forEach(l => { %>
+      <tr>
+        <td><b><bdi><%= l.full_name %></bdi></b><div class="small muted"><%= t('Iqama No.') %> <%= l.iqama_number || '—' %></div>
+          <% if (ts.payment_method === 'bank') { %><div class="small muted" dir="ltr"><%= l.bank_name || '' %> <%= l.iban || '' %></div><% } %></td>
+        <td><%= l.days_worked %></td>
+        <td><%= l.hours %></td>
+        <td class="nowrap"><b><%= money(l.amount) %></b></td>
+        <td>
+          <%- include('partials/pay-badge', { status: l.payment_status }) %>
+          <% if (l.payment_status === 'paid') { %>
+            <div class="small muted"><%= fmtDate(l.paid_at) %><%= l.payment_ref ? ' · ' : '' %><bdi><%= l.payment_ref %></bdi></div>
+            <div class="small"><a href="/payslips/<%= l.id %>" target="_blank"><%= t('Payment slip') %></a><% if (l.proof_file) { %> · <a href="/timesheet-lines/<%= l.id %>/proof" target="_blank"><%= t('Receipt') %></a><% } %></div>
+          <% } else if (ts.status === 'confirmed') { %>
+            <details class="pay-form">
+              <summary class="btn btn-sm"><%= t('Mark as paid') %></summary>
+              <form method="post" action="/timesheet-lines/<%= l.id %>/paid" enctype="multipart/form-data">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <label><%= t('Payment date') %> <input type="date" name="paid_at" value="<%= new Date().toISOString().slice(0, 10) %>"></label>
+                <label><%= t('Reference (optional)') %> <input name="payment_ref" maxlength="100" placeholder="<%= t('e.g. bank transfer number') %>"></label>
+                <label><%= t('Receipt (optional)') %> <input type="file" name="proof" accept=".pdf,image/*"></label>
+                <button class="btn btn-sm"><%= t('Save payment') %></button>
+              </form>
+            </details>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<% if (isAdmin && ts.status === 'submitted') { %>
+<div class="card medium review-box">
+  <h2><%= t('Check and confirm') %></h2>
+  <p class="muted"><%= t('Open the uploaded file and compare it with the hours and amounts above. When you confirm, every worker gets a message with their hours, amount and payment status.') %></p>
+  <form method="post" action="/admin/timesheets/<%= ts.id %>/review">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label><%= t('Note (required when sending back)') %> <textarea name="admin_note" rows="2" maxlength="1000"></textarea></label>
+    <div class="actions">
+      <button class="btn" name="action" value="confirm"><%= t('Confirm and inform workers') %></button>
+      <button class="btn btn-danger" name="action" value="reject"><%= t('Send back for correction') %></button>
+    </div>
+  </form>
+</div>
+<% } %>
+<%- include('partials/footer') %>

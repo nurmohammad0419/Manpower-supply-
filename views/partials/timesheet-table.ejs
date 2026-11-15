@@ -1,0 +1,22 @@
+<% if (!timesheets.length) { %>
+  <div class="card empty"><%= t('No timesheets yet.') %></div>
+<% } else { %>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Month') %></th><th><%= t('Demand') %></th><th><%= t('Workers') %></th><th><%= t('Hours') %></th><th><%= t('Amount (SAR)') %></th><th><%= t('Paid') %></th><th><%= t('Status') %></th></tr></thead>
+    <tbody>
+    <% timesheets.forEach(ts => { %>
+      <tr>
+        <td class="nowrap"><a href="<%= linkBase %><%= ts.id %>"><b><%= fmtMonth(ts.month) %></b></a></td>
+        <td><bdi><%= ts.demand_title %></bdi><% if (locals.showCompany) { %><div class="small muted"><bdi><%= ts.company_name %></bdi></div><% } %></td>
+        <td><%= ts.worker_count %></td>
+        <td><%= ts.total_hours %></td>
+        <td class="nowrap"><%= money(ts.total_amount) %></td>
+        <td><%= ts.paid_count %> / <%= ts.worker_count %></td>
+        <td><%- include('ts-badge', { status: ts.status }) %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<% } %>

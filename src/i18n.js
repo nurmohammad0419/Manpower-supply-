@@ -36,4 +36,15 @@ function pickLanguage(req) {
   return m && LANGUAGES[m[1]] ? m[1] : DEFAULT_LANG;
 }
 
-module.exports = { LANGUAGES, DEFAULT_LANG, dictionaries, translator, pickLanguage };
+// "2026-11" → "November 2026" in the given language (always with Western digits).
+function formatMonth(ym, lang) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''));
+  if (!m) return String(ym || '');
+  const locale = (LANGUAGES[lang] || LANGUAGES.en).locale + '-u-nu-latn';
+  return new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+// 2340.5 → "2,340.50"
+const formatMoney = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+module.exports = { LANGUAGES, DEFAULT_LANG, dictionaries, translator, pickLanguage, formatMonth, formatMoney };
