@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · ManpowerHub KSA</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="/"><span class="logo">MH</span> ManpowerHub <small>KSA</small></a>
+    <nav class="nav">
+      <a href="/demands" class="<%= path.startsWith('/demands') ? 'active' : '' %>">Job Demands</a>
+      <% if (!user) { %>
+        <a href="/login">Login</a>
+        <a class="btn btn-sm" href="/register">Register</a>
+      <% } else { %>
+        <% if (user.role === 'company') { %>
+          <a href="/company" class="<%= path === '/company' ? 'active' : '' %>">Dashboard</a>
+          <a href="/company/demands/new">+ Post Demand</a>
+          <a href="/company/profile">Profile</a>
+        <% } else if (user.role === 'worker') { %>
+          <a href="/worker" class="<%= path === '/worker' ? 'active' : '' %>">My Applications</a>
+          <a href="/worker/documents">Documents</a>
+          <a href="/worker/profile">Profile</a>
+        <% } else { %>
+          <a href="/admin">Admin</a>
+        <% } %>
+        <form method="post" action="/logout" class="inline">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="linklike" title="Log out <%= user.name %>">Logout</button>
+        </form>
+      <% } %>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+<% if (flash) { %><div class="alert alert-<%= flash.type %>"><%= flash.message %></div><% } %>

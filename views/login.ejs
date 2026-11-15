@@ -1,0 +1,14 @@
+<%- include('partials/header') %>
+<div class="card narrow">
+  <h1>Login</h1>
+  <% if (locals.error) { %><div class="alert alert-error"><%= error %></div><% } %>
+  <form method="post" action="/login">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="next" value="<%= next %>">
+    <label>Email <input type="email" name="email" required value="<%= locals.email || '' %>" autocomplete="email"></label>
+    <label>Password <input type="password" name="password" required autocomplete="current-password"></label>
+    <button class="btn full">Login</button>
+  </form>
+  <p class="muted center">No account? <a href="/register">Register</a></p>
+</div>
+<%- include('partials/footer') %>

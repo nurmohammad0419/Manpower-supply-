@@ -1,0 +1,76 @@
+<%- include('../partials/header') %>
+<h1>Admin panel</h1>
+<div class="stats stats-row">
+  <div class="stat"><b><%= stats.companies %></b><span>Companies</span></div>
+  <div class="stat"><b><%= stats.pending %></b><span>Pending approval</span></div>
+  <div class="stat"><b><%= stats.workers %></b><span>Workers</span></div>
+  <div class="stat"><b><%= stats.demands %></b><span>Open demands</span></div>
+  <div class="stat"><b><%= stats.applications %></b><span>Applications</span></div>
+  <div class="stat"><b><%= stats.hired %></b><span>Hired</span></div>
+</div>
+
+<h2>Companies</h2>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th>Company</th><th>CR No.</th><th>Contact</th><th>Demands</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>
+    <% if (!companies.length) { %><tr><td colspan="6" class="muted">No companies yet.</td></tr><% } %>
+    <% companies.forEach(c => { %>
+      <tr>
+        <td><b><%= c.company_name %></b><div class="small muted"><%= c.city %> · joined <%= fmtDate(c.created_at) %></div></td>
+        <td><%= c.cr_number %></td>
+        <td class="small"><%= c.contact_person %><br><%= c.phone %><br><%= c.email %></td>
+        <td><%= c.demand_count %></td>
+        <td><span class="badge badge-<%= c.status === 'approved' ? 'hired' : c.status === 'rejected' ? 'rejected' : 'applied' %>"><%= c.status %></span></td>
+        <td class="nowrap">
+          <form method="post" action="/admin/companies/<%= c.user_id %>/status" class="inline">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <% if (c.status !== 'approved') { %><button name="status" value="approved" class="btn btn-sm">Approve</button><% } %>
+            <% if (c.status !== 'rejected') { %><button name="status" value="rejected" class="btn btn-sm btn-danger">Reject</button><% } %>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<h2>Demands</h2>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th>Demand</th><th>Company</th><th>Rate</th><th>Filled</th><th>Applicants</th><th>Status</th></tr></thead>
+    <tbody>
+    <% if (!demands.length) { %><tr><td colspan="6" class="muted">No demands yet.</td></tr><% } %>
+    <% demands.forEach(d => { %>
+      <tr>
+        <td><a href="/demands/<%= d.id %>"><%= d.title %></a><div class="small muted"><%= d.category %> · <%= d.location_city %></div></td>
+        <td><%= d.company_name %></td>
+        <td><%= d.salary_amount %> SAR <span class="small muted"><%= SALARY_TYPES[d.salary_type] %></span></td>
+        <td><%= d.hired_count %> / <%= d.quantity %></td>
+        <td><%= d.applicant_count %></td>
+        <td><%= d.status %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<h2>Workers</h2>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th>Name</th><th>Profession</th><th>Contact</th><th>Docs</th><th>Applications</th></tr></thead>
+    <tbody>
+    <% if (!workers.length) { %><tr><td colspan="5" class="muted">No workers yet.</td></tr><% } %>
+    <% workers.forEach(w => { %>
+      <tr>
+        <td><a href="/admin/workers/<%= w.user_id %>"><b><%= w.full_name %></b></a><div class="small muted"><%= w.nationality %> · Iqama <%= w.iqama_number || '—' %></div></td>
+        <td><%= w.profession %> <span class="small muted">(<%= w.experience_years %> yrs)</span></td>
+        <td class="small"><%= w.phone %><br><%= w.email %></td>
+        <td><%= w.doc_count %></td>
+        <td><%= w.app_count %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<%- include('../partials/footer') %>

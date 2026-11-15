@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demand Letter #<%= demand.id %></title><link rel="stylesheet" href="/style.css"></head>
+<body class="letter-body">
+<div class="letter">
+  <div class="letter-head">
+    <div><h1><%= demand.company_name %></h1><div>CR No: <%= demand.cr_number %> · <%= demand.company_city %></div></div>
+    <div class="right"><b>DEMAND LETTER</b><br>Ref: MH-<%= String(demand.id).padStart(5, '0') %><br>Date: <%= fmtDate(demand.created_at) %></div>
+  </div>
+  <p>We require the following manpower. Interested candidates may apply online at ManpowerHub KSA with the documents listed below.</p>
+  <table class="letter-table">
+    <tr><th>Position</th><td><%= demand.title %> (<%= demand.category %>)</td></tr>
+    <tr><th>Number of workers</th><td><%= demand.quantity %></td></tr>
+    <tr><th>Salary / Rate</th><td><%= demand.salary_amount %> SAR <%= SALARY_TYPES[demand.salary_type] %></td></tr>
+    <tr><th>Working hours</th><td><%= demand.hours_per_day %> hours/day, <%= demand.days_per_week %> days/week</td></tr>
+    <tr><th>Overtime</th><td><%= demand.overtime || '—' %></td></tr>
+    <tr><th>Duration</th><td><%= demand.duration %></td></tr>
+    <tr><th>Work location</th><td><%= demand.location_city %><%= demand.work_site ? ' — ' + demand.work_site : '' %></td></tr>
+    <tr><th>Food</th><td><%= yesNo(demand.food) %></td></tr>
+    <tr><th>Accommodation</th><td><%= yesNo(demand.accommodation) %></td></tr>
+    <tr><th>Transport</th><td><%= yesNo(demand.transport) %></td></tr>
+    <tr><th>Start date</th><td><%= demand.start_date ? fmtDate(demand.start_date) : 'Immediate' %></td></tr>
+    <tr><th>Last date to apply</th><td><%= demand.deadline ? fmtDate(demand.deadline) : 'Until filled' %></td></tr>
+    <tr><th>Documents required</th><td><%= demand.required_docs.split(',').filter(Boolean).map(d => DOC_TYPES[d]).join(', ') || '—' %></td></tr>
+  </table>
+  <% if (demand.requirements) { %><h3>Other requirements</h3><p class="prewrap"><%= demand.requirements %></p><% } %>
+  <div class="letter-sign">
+    <div>Contact person: <b><%= demand.contact_person %></b></div>
+    <div class="sigline">Authorized signature &amp; stamp</div>
+  </div>
+  <button class="btn noprint" onclick="window.print()">Print / Save as PDF</button>
+</div>
+</body></html>

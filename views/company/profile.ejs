@@ -1,0 +1,15 @@
+<%- include('../partials/header') %>
+<div class="card medium">
+  <h1>Company profile</h1>
+  <p>Verification status: <span class="badge badge-<%= form.status === 'approved' ? 'hired' : form.status === 'rejected' ? 'rejected' : 'applied' %>"><%= form.status %></span></p>
+  <form method="post" action="/company/profile">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <%- include('../partials/company-fields', { lockCr: true }) %>
+    <div class="row2">
+      <label>Email <input value="<%= form.email %>" disabled></label>
+      <label>Phone <input name="phone" value="<%= form.phone || '' %>"></label>
+    </div>
+    <button class="btn">Save</button>
+  </form>
+</div>
+<%- include('../partials/footer') %>

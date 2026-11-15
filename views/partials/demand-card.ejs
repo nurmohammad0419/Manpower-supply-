@@ -1,0 +1,19 @@
+<a class="demand-card" href="/demands/<%= d.id %>">
+  <div class="dc-top">
+    <span class="tag"><%= d.category %></span>
+    <span class="muted small"><%= d.location_city %></span>
+  </div>
+  <h3><%= d.title %></h3>
+  <div class="muted small"><%= d.company_name %></div>
+  <div class="rate"><strong><%= d.salary_amount %> SAR</strong> <%= SALARY_TYPES[d.salary_type] %></div>
+  <div class="dc-meta">
+    <span><%= d.quantity %> workers</span>
+    <span><%= d.hours_per_day %> hrs/day</span>
+    <span><%= d.duration %></span>
+  </div>
+  <div class="dc-perks">
+    <% if (d.food !== 'no') { %><span class="perk">Food</span><% } %>
+    <% if (d.accommodation !== 'no') { %><span class="perk">Accommodation</span><% } %>
+    <% if (d.transport !== 'no') { %><span class="perk">Transport</span><% } %>
+  </div>
+</a>

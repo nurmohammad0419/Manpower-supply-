@@ -1,0 +1,73 @@
+<%- include('partials/header') %>
+<% const req = demand.required_docs ? demand.required_docs.split(',').filter(Boolean) : []; %>
+<div class="crumbs"><a href="/demands">← All demands</a></div>
+<div class="detail">
+  <div class="card">
+    <span class="tag"><%= demand.category %></span>
+    <% if (demand.status !== 'open') { %><span class="badge badge-rejected">Closed</span><% } %>
+    <h1><%= demand.title %></h1>
+    <p class="muted"><%= demand.company_name %> · <%= demand.location_city %><%= demand.work_site ? ' — ' + demand.work_site : '' %></p>
+    <div class="rate big"><strong><%= demand.salary_amount %> SAR</strong> <%= SALARY_TYPES[demand.salary_type] %></div>
+
+    <table class="kv">
+      <tr><th>Workers needed</th><td><%= demand.quantity %> <span class="muted">(<%= demand.hired_count %> hired)</span></td></tr>
+      <tr><th>Working hours</th><td><%= demand.hours_per_day %> hours/day, <%= demand.days_per_week %> days/week</td></tr>
+      <tr><th>Overtime</th><td><%= demand.overtime || '—' %></td></tr>
+      <tr><th>Contract duration</th><td><%= demand.duration %></td></tr>
+      <tr><th>Food</th><td><%= yesNo(demand.food) %></td></tr>
+      <tr><th>Accommodation</th><td><%= yesNo(demand.accommodation) %></td></tr>
+      <tr><th>Transport</th><td><%= yesNo(demand.transport) %></td></tr>
+      <tr><th>Start date</th><td><%= demand.start_date ? fmtDate(demand.start_date) : 'Immediate' %></td></tr>
+      <tr><th>Apply before</th><td><%= demand.deadline ? fmtDate(demand.deadline) : 'Until filled' %></td></tr>
+    </table>
+    <% if (demand.requirements) { %>
+      <h3>Requirements &amp; details</h3>
+      <p class="prewrap"><%= demand.requirements %></p>
+    <% } %>
+    <h3>Documents required</h3>
+    <ul class="doclist">
+      <% req.forEach(d => { %><li><%= DOC_TYPES[d] %></li><% }) %>
+      <% if (!req.length) { %><li class="muted">No specific documents</li><% } %>
+    </ul>
+    <p><a href="/demands/<%= demand.id %>/letter" target="_blank">View printable demand letter ↗</a></p>
+  </div>
+
+  <aside class="card apply-box">
+    <% if (isOwner) { %>
+      <h2>Your demand</h2>
+      <p><%= demand.applicant_count %> applicant(s)</p>
+      <a class="btn full" href="/company/demands/<%= demand.id %>">Manage applicants</a>
+    <% } else if (!user) { %>
+      <h2>Apply for this job</h2>
+      <p class="muted">Log in or register as a worker to apply.</p>
+      <a class="btn full" href="/login?next=/demands/<%= demand.id %>">Login to apply</a>
+      <a class="btn btn-alt full" href="/register/worker">Register as worker</a>
+    <% } else if (user.role !== 'worker') { %>
+      <p class="muted">Only worker accounts can apply.</p>
+    <% } else if (application && application.status !== 'withdrawn') { %>
+      <h2>You applied</h2>
+      <p>Status: <span class="badge badge-<%= application.status %>"><%= APP_STATUS[application.status] %></span></p>
+      <% if (application.company_note) { %><p class="muted">Company note: <%= application.company_note %></p><% } %>
+      <a class="btn btn-alt full" href="/worker">Go to my applications</a>
+    <% } else if (demand.status !== 'open') { %>
+      <p class="muted">This demand is closed.</p>
+    <% } else { %>
+      <h2>Apply for this job</h2>
+      <form method="post" action="/demands/<%= demand.id %>/apply" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <p class="small muted">Required documents:</p>
+        <% req.forEach(d => { const has = workerDocTypes.includes(d); %>
+          <div class="docreq <%= has ? 'ok' : 'missing' %>">
+            <div><%= has ? '✓' : '!' %> <%= DOC_TYPES[d] %> <span class="small muted"><%= has ? '(from your profile)' : '(please upload)' %></span></div>
+            <% if (!has) { %><input type="file" name="doc_<%= d %>" accept=".pdf,image/*" required><% } %>
+          </div>
+        <% }) %>
+        <label>Message to company (optional)
+          <textarea name="cover_note" rows="3" maxlength="1000" placeholder="e.g. I have 5 years experience, transferable Iqama, available immediately"></textarea>
+        </label>
+        <button class="btn full">Submit application</button>
+      </form>
+    <% } %>
+  </aside>
+</div>
+<%- include('partials/footer') %>

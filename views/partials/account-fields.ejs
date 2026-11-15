@@ -1,0 +1,11 @@
+<fieldset>
+  <legend>Login details</legend>
+  <div class="row2">
+    <label>Email * <input type="email" name="email" required value="<%= form.email || '' %>" autocomplete="email"></label>
+    <label>Phone (WhatsApp) * <input type="tel" name="phone" required value="<%= form.phone || '' %>" placeholder="+966 5x xxx xxxx"></label>
+  </div>
+  <div class="row2">
+    <label>Password * <input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
+    <label>Confirm password * <input type="password" name="password_confirm" required minlength="6" autocomplete="new-password"></label>
+  </div>
+</fieldset>

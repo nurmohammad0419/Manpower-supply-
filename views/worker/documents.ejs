@@ -1,0 +1,34 @@
+<%- include('../partials/header') %>
+<% const have = new Set(documents.map(d => d.doc_type)); %>
+<h1>My documents</h1>
+<p class="muted">Upload once — your documents are attached automatically when you apply. Only companies you apply to (and the admin) can see them. PDF, JPG or PNG, max 5 MB each.</p>
+<div class="detail">
+  <div class="card">
+    <h2>Uploaded</h2>
+    <% if (!documents.length) { %><p class="muted">No documents yet.</p><% } %>
+    <div class="docs">
+      <% documents.forEach(d => { %>
+        <div class="doc">
+          <a href="/documents/<%= d.id %>" target="_blank">
+            <% if (d.mime_type.startsWith('image/')) { %><img src="/documents/<%= d.id %>" alt=""><% } else { %><div class="pdf">PDF</div><% } %>
+          </a>
+          <b><%= DOC_TYPES[d.doc_type] %></b><span class="small muted"><%= d.original_name %> · <%= fmtDate(d.uploaded_at) %></span>
+          <form method="post" action="/worker/documents/<%= d.id %>/delete" onsubmit="return confirm('Delete this document?')">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linklike danger small">Delete</button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <aside class="card">
+    <h2>Upload</h2>
+    <form method="post" action="/worker/documents" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <% Object.entries(DOC_TYPES).forEach(([k, v]) => { %>
+        <label class="upload-row"><span><%= have.has(k) ? '✓ ' : '' %><%= v %></span><input type="file" name="doc_<%= k %>" accept=".pdf,image/*"></label>
+      <% }) %>
+      <button class="btn full">Upload selected</button>
+    </form>
+  </aside>
+</div>
+<%- include('../partials/footer') %>

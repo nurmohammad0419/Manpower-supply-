@@ -1,0 +1,76 @@
+<%- include('../partials/header') %>
+<% const docs = String(form.required_docs || '').split(','); %>
+<div class="card medium">
+  <h1><%= title %></h1>
+  <% if (locals.error) { %><div class="alert alert-error"><%= error %></div><% } %>
+  <form method="post" action="<%= action %>">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <fieldset><legend>Job</legend>
+      <label>Job title * <input name="title" required maxlength="150" value="<%= form.title || '' %>" placeholder="e.g. Electrician for villa project"></label>
+      <div class="row2">
+        <label>Category *
+          <select name="category" required>
+            <option value="">Choose…</option>
+            <% CATEGORIES.forEach(c => { %><option <%= form.category === c ? 'selected' : '' %>><%= c %></option><% }) %>
+          </select>
+        </label>
+        <label>Number of workers needed * <input type="number" name="quantity" min="1" max="10000" required value="<%= form.quantity || '' %>"></label>
+      </div>
+    </fieldset>
+    <fieldset><legend>Pay &amp; hours</legend>
+      <div class="row3">
+        <label>Rate (SAR) * <input type="number" name="salary_amount" min="0" step="0.01" required value="<%= form.salary_amount ?? '' %>"></label>
+        <label>Rate type *
+          <select name="salary_type" required>
+            <% Object.entries(SALARY_TYPES).forEach(([k, v]) => { %><option value="<%= k %>" <%= form.salary_type === k ? 'selected' : '' %>><%= v %></option><% }) %>
+          </select>
+        </label>
+        <label>Overtime <input name="overtime" value="<%= form.overtime || '' %>" placeholder="e.g. 1.5x after 8 hours"></label>
+      </div>
+      <div class="row3">
+        <label>Hours per day * <input type="number" name="hours_per_day" min="1" max="24" required value="<%= form.hours_per_day || '' %>"></label>
+        <label>Days per week * <input type="number" name="days_per_week" min="1" max="7" required value="<%= form.days_per_week || 6 %>"></label>
+        <label>Contract duration * <input name="duration" required value="<%= form.duration || '' %>" placeholder="e.g. 3 months / 1 year"></label>
+      </div>
+    </fieldset>
+    <fieldset><legend>Location &amp; facilities</legend>
+      <div class="row2">
+        <label>City *
+          <select name="location_city" required>
+            <option value="">Choose…</option>
+            <% CITIES.forEach(c => { %><option <%= form.location_city === c ? 'selected' : '' %>><%= c %></option><% }) %>
+          </select>
+        </label>
+        <label>Work site / area <input name="work_site" value="<%= form.work_site || '' %>" placeholder="e.g. Al Malqa district"></label>
+      </div>
+      <div class="row3">
+        <% [['food','Food'],['accommodation','Accommodation'],['transport','Transport']].forEach(([k, label]) => { %>
+          <label><%= label %>
+            <select name="<%= k %>">
+              <option value="yes" <%= form[k] === 'yes' ? 'selected' : '' %>>Provided by company</option>
+              <option value="allowance" <%= form[k] === 'allowance' ? 'selected' : '' %>>Allowance paid</option>
+              <option value="no" <%= !form[k] || form[k] === 'no' ? 'selected' : '' %>>Not provided</option>
+            </select>
+          </label>
+        <% }) %>
+      </div>
+      <div class="row2">
+        <label>Start date <input type="date" name="start_date" value="<%= form.start_date || '' %>"></label>
+        <label>Last date to apply <input type="date" name="deadline" value="<%= form.deadline || '' %>"></label>
+      </div>
+    </fieldset>
+    <fieldset><legend>Requirements</legend>
+      <label>Other requirements / details
+        <textarea name="requirements" rows="4" maxlength="3000" placeholder="e.g. Transferable Iqama, Saudi experience preferred, must know Arabic basics"><%= form.requirements || '' %></textarea>
+      </label>
+      <div class="label">Documents workers must submit</div>
+      <div class="checks">
+        <% Object.entries(DOC_TYPES).forEach(([k, v]) => { %>
+          <label class="check"><input type="checkbox" name="required_docs" value="<%= k %>" <%= docs.includes(k) ? 'checked' : '' %>> <%= v %></label>
+        <% }) %>
+      </div>
+    </fieldset>
+    <button class="btn full">Save demand</button>
+  </form>
+</div>
+<%- include('../partials/footer') %>

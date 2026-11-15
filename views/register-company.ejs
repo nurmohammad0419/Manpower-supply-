@@ -1,0 +1,13 @@
+<%- include('partials/header') %>
+<div class="card medium">
+  <h1>Company registration</h1>
+  <p class="muted">Register once. After admin verification your demands become visible to workers.</p>
+  <% if (locals.error) { %><div class="alert alert-error"><%= error %></div><% } %>
+  <form method="post" action="/register/company">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <fieldset><legend>Company details</legend><%- include('partials/company-fields') %></fieldset>
+    <%- include('partials/account-fields') %>
+    <button class="btn full">Register company</button>
+  </form>
+</div>
+<%- include('partials/footer') %>

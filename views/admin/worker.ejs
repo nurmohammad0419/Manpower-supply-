@@ -1,0 +1,23 @@
+<%- include('../partials/header') %>
+<div class="crumbs"><a href="/admin">← Admin</a></div>
+<div class="card">
+  <h1><%= worker.full_name %></h1>
+  <table class="kv">
+    <tr><th>Nationality</th><td><%= worker.nationality %></td></tr>
+    <tr><th>Profession</th><td><%= worker.profession %> (<%= worker.experience_years %> years)</td></tr>
+    <tr><th>Iqama No.</th><td><%= worker.iqama_number || '—' %></td></tr>
+    <tr><th>Passport No.</th><td><%= worker.passport_number || '—' %></td></tr>
+    <tr><th>Phone / Email</th><td><%= worker.phone %> · <%= worker.email %></td></tr>
+  </table>
+  <h3>Documents</h3>
+  <div class="docs">
+    <% documents.forEach(d => { %>
+      <a class="doc" href="/documents/<%= d.id %>" target="_blank">
+        <% if (d.mime_type.startsWith('image/')) { %><img src="/documents/<%= d.id %>" alt=""><% } else { %><div class="pdf">PDF</div><% } %>
+        <b><%= DOC_TYPES[d.doc_type] %></b><span class="small muted"><%= d.original_name %></span>
+      </a>
+    <% }) %>
+    <% if (!documents.length) { %><p class="muted">No documents.</p><% } %>
+  </div>
+</div>
+<%- include('../partials/footer') %>

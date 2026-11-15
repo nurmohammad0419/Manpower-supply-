@@ -1,0 +1,43 @@
+<%- include('../partials/header') %>
+<% const essentials = ['iqama','passport','photo','cv']; const missing = essentials.filter(d => !docTypes.includes(d)); %>
+<h1>Hello, <%= worker.full_name %></h1>
+<% if (missing.length) { %>
+  <div class="alert alert-warn">Complete your profile to apply faster — missing: <%= missing.map(m => DOC_TYPES[m]).join(', ') %>. <a href="/worker/documents">Upload now →</a></div>
+<% } %>
+
+<h2>My applications</h2>
+<% if (!applications.length) { %>
+  <div class="card empty">You have not applied to any job yet. <a href="/demands">Browse demands →</a></div>
+<% } else { %>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th>Job</th><th>Rate</th><th>Status</th><th>Updated</th><th></th></tr></thead>
+    <tbody>
+    <% applications.forEach(a => { %>
+      <tr>
+        <td><a href="/demands/<%= a.demand_id %>"><b><%= a.title %></b></a><div class="small muted"><%= a.company_name %> · <%= a.location_city %></div>
+          <% if (a.company_note && a.status !== 'withdrawn') { %><div class="note">💬 <%= a.company_note %></div><% } %></td>
+        <td><%= a.salary_amount %> SAR <span class="small muted"><%= SALARY_TYPES[a.salary_type] %></span></td>
+        <td><span class="badge badge-<%= a.status %>"><%= APP_STATUS[a.status] %></span></td>
+        <td class="small"><%= fmtDate(a.updated_at) %></td>
+        <td>
+          <% if (['applied','shortlisted'].includes(a.status)) { %>
+          <form method="post" action="/worker/applications/<%= a.id %>/withdraw" class="inline" onsubmit="return confirm('Withdraw this application?')">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linklike danger">Withdraw</button>
+          </form>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+
+<div class="section-head"><h2>Jobs you may like</h2><a href="/demands">All demands →</a></div>
+<% if (!recommended.length) { %>
+  <div class="card empty">No new demands right now. Check back soon.</div>
+<% } else { %>
+  <div class="grid"><% recommended.forEach(d => { %><%- include('../partials/demand-card', { d }) %><% }) %></div>
+<% } %>
+<%- include('../partials/footer') %>

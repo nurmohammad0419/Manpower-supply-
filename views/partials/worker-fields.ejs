@@ -1,0 +1,28 @@
+<div class="row2">
+  <label>Full name (as in Iqama/Passport) * <input name="full_name" required value="<%= form.full_name || '' %>"></label>
+  <label>Nationality * <input name="nationality" required value="<%= form.nationality || '' %>" list="nationalities"></label>
+</div>
+<datalist id="nationalities"><% ['Bangladesh','India','Pakistan','Nepal','Philippines','Sri Lanka','Egypt','Sudan','Yemen','Indonesia','Kenya','Uganda','Ethiopia'].forEach(n => { %><option><%= n %></option><% }) %></datalist>
+<div class="row2">
+  <label>Iqama number <input name="iqama_number" value="<%= form.iqama_number || '' %>" inputmode="numeric"></label>
+  <label>Passport number <input name="passport_number" value="<%= form.passport_number || '' %>"></label>
+</div>
+<div class="row3">
+  <label>Main profession *
+    <select name="profession" required>
+      <option value="">Choose…</option>
+      <% CATEGORIES.forEach(c => { %><option <%= form.profession === c ? 'selected' : '' %>><%= c %></option><% }) %>
+    </select>
+  </label>
+  <label>Experience (years) <input type="number" min="0" max="60" name="experience_years" value="<%= form.experience_years || 0 %>"></label>
+  <label>Current city
+    <select name="city">
+      <option value="">Choose…</option>
+      <% CITIES.forEach(c => { %><option <%= form.city === c ? 'selected' : '' %>><%= c %></option><% }) %>
+    </select>
+  </label>
+</div>
+<div class="row2">
+  <label>Date of birth <input type="date" name="date_of_birth" value="<%= form.date_of_birth || '' %>"></label>
+  <label>Skills / languages <input name="skills" value="<%= form.skills || '' %>" placeholder="e.g. Shuttering, tiles; Arabic, Hindi"></label>
+</div>
