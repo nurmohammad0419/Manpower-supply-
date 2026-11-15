@@ -6,6 +6,7 @@ const { startApp, PNG, PDF } = require('./support/harness');
 const ctx = startApp({ WHATSAPP_PROVIDER: 'meta', WHATSAPP_TOKEN: 't', WHATSAPP_PHONE_NUMBER_ID: '1' });
 const { Client } = ctx;
 const notify = require('../src/notify');
+const db = require('../src/db');
 
 const sent = [];
 notify._setFetch(async (url, opts) => { sent.push(JSON.parse(opts.body)); return new Response('{}'); });
@@ -50,6 +51,7 @@ test('setup: company hires two workers', async () => {
   await rahim.get('/lang?code=bn&next=/');
   for (const [w, name, phone, email] of [[rahim, 'Rahim', '0551000001', 'rahim@test.local'], [karim, 'Karim', '0551000002', 'karim@test.local']]) {
     await w.post('/register/worker', { full_name: name, nationality: 'Bangladesh', profession: 'Steel Fixer', phone, email, password: 'secret12', password_confirm: 'secret12', notify_channel: 'whatsapp' }, '/register/worker');
+    db.prepare("UPDATE workers SET status = 'approved'").run();
     await w.post(`/demands/${demandId}/apply`, await form({}), `/demands/${demandId}`);
   }
   await rahim.post('/worker/profile', { full_name: 'Rahim', nationality: 'Bangladesh', profession: 'Steel Fixer', phone: '0551000001', notify_channel: 'whatsapp', bank_name: 'Al Rajhi', iban: 'sa03 8000 0000 6080 1016 7519' }, '/worker/profile');

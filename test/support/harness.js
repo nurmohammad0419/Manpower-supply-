@@ -59,6 +59,14 @@ function startApp(env = {}) {
   }
   ctx.Client = Client;
 
+  // Admin approves every worker that is waiting for approval.
+  ctx.approveWorkers = async (admin) => {
+    const page = await admin.get('/admin');
+    for (const m of page.text.matchAll(/\/admin\/workers\/(\d+)\/status" class="inline quick" data-approve/g)) {
+      await admin.post(`/admin/workers/${m[1]}/status`, { status: 'approved', back: 'list' }, '/admin');
+    }
+  };
+
   // Admin confirms the agreement with the company and publishes the job for workers.
   ctx.publish = async (admin, demandId, overrides = {}) => {
     const page = await admin.get('/admin/demands/' + demandId);

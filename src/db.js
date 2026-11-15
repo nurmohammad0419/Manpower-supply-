@@ -232,6 +232,9 @@ if (addColumn('demands', 'review_status', "TEXT NOT NULL DEFAULT 'pending'")) {
     show_company = 1, published_at = created_at`);
 }
 addColumn('timesheet_lines', 'worker_amount', 'REAL'); // what the worker is paid (set by the admin)
+// Workers need the admin's approval before they can see jobs. Workers registered before this existed stay approved.
+if (addColumn('workers', 'status', "TEXT NOT NULL DEFAULT 'pending'")) db.exec("UPDATE workers SET status = 'approved'");
+addColumn('workers', 'status_note', 'TEXT');
 addColumn('timesheets', 'client_due_date', 'TEXT'); // when the company must pay the supplier
 addColumn('timesheets', 'client_paid_at', 'TEXT');
 // Workers registered before positions existed: their main profession is their position.

@@ -1,13 +1,18 @@
 <%- include('../partials/header') %>
 <% const essentials = ['iqama','passport','photo','cv']; const missing = essentials.filter(d => !docTypes.includes(d)); %>
 <h1><%= t('Hello, {name}', { name: worker.full_name }) %></h1>
+<% if (worker.status === 'pending') { %>
+  <div class="alert alert-warn"><b><%= t('Your account is waiting for approval.') %></b> <%= t('ManpowerHub KSA checks your details and documents. After approval you can see all jobs and apply, and you get a message when a new job for your position is posted.') %></div>
+<% } else if (worker.status === 'rejected') { %>
+  <div class="alert alert-error"><b><%= t('Your registration could not be approved.') %></b> <bdi><%= worker.status_note || '' %></bdi></div>
+<% } %>
 <% if (missing.length) { %>
   <div class="alert alert-warn"><%= t('Complete your profile to apply faster — missing: {docs}.', { docs: missing.map(m => t(DOC_TYPES[m])).join(', ') }) %> <a href="/worker/documents"><%= t('Upload now') %> <span class="arr">→</span></a></div>
 <% } %>
 
 <h2><%= t('My applications') %></h2>
 <% if (!applications.length) { %>
-  <div class="card empty"><%= t('You have not applied to any job yet.') %> <a href="/demands"><%= t('Browse demands') %> <span class="arr">→</span></a></div>
+  <div class="card empty"><%= t('You have not applied to any job yet.') %> <% if (worker.status === 'approved') { %><a href="/demands"><%= t('Browse demands') %> <span class="arr">→</span></a><% } %></div>
 <% } else { %>
 <div class="card table-wrap">
   <table class="table">
@@ -34,10 +39,12 @@
 </div>
 <% } %>
 
+<% if (worker.status === 'approved') { %>
 <div class="section-head"><h2><%= t('Jobs you may like') %></h2><a href="/demands"><%= t('All demands') %> <span class="arr">→</span></a></div>
 <% if (!recommended.length) { %>
   <div class="card empty"><%= t('No new demands right now. Check back soon.') %></div>
 <% } else { %>
   <div class="grid"><% recommended.forEach(d => { %><%- include('../partials/demand-card', { d }) %><% }) %></div>
+<% } %>
 <% } %>
 <%- include('../partials/footer') %>

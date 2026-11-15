@@ -8,6 +8,7 @@
   <div class="stat"><b><%= stats.companies %></b><span><%= t('Companies') %></span></div>
   <div class="stat"><b><%= stats.pending %></b><span><%= t('Pending approval') %></span></div>
   <div class="stat"><b><%= stats.workers %></b><span><%= t('Workers') %></span></div>
+  <div class="stat"><b><%= stats.pendingWorkers %></b><span><%= t('Workers waiting for approval') %></span></div>
   <div class="stat"><b><%= stats.demands %></b><span><%= t('Open demands') %></span></div>
   <div class="stat"><b><%= stats.applications %></b><span><%= t('Applications') %></span></div>
   <div class="stat"><b><%= stats.hired %></b><span><%= t('Hired') %></span></div>
@@ -64,9 +65,9 @@
 <h2><%= t('Workers') %></h2>
 <div class="card table-wrap">
   <table class="table">
-    <thead><tr><th><%= t('Name') %></th><th><%= t('Profession') %></th><th><%= t('Contact') %></th><th><%= t('Documents') %></th><th><%= t('Applications') %></th></tr></thead>
+    <thead><tr><th><%= t('Name') %></th><th><%= t('Profession') %></th><th><%= t('Contact') %></th><th><%= t('Documents') %></th><th><%= t('Applications') %></th><th><%= t('Status') %></th></tr></thead>
     <tbody>
-    <% if (!workers.length) { %><tr><td colspan="5" class="muted"><%= t('No workers yet.') %></td></tr><% } %>
+    <% if (!workers.length) { %><tr><td colspan="6" class="muted"><%= t('No workers yet.') %></td></tr><% } %>
     <% workers.forEach(w => { %>
       <tr>
         <td><a href="/admin/workers/<%= w.user_id %>"><b><bdi><%= w.full_name %></bdi></b></a><div class="small muted"><%= t(w.nationality) %> · <%= t('Iqama No.') %> <%= w.iqama_number || '—' %></div></td>
@@ -74,6 +75,14 @@
         <td class="small"><span dir="ltr"><%= w.phone %></span><br><%= w.email %></td>
         <td><%= w.doc_count %></td>
         <td><%= w.app_count %></td>
+        <td class="nowrap"><%- include('../partials/worker-status-badge', { status: w.status }) %>
+          <% if (w.status !== 'approved') { %>
+          <form method="post" action="/admin/workers/<%= w.user_id %>/status" class="inline quick" data-approve>
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="list">
+            <button name="status" value="approved" class="btn btn-sm"><%= t('Approve') %></button>
+          </form>
+          <% } %>
+        </td>
       </tr>
     <% }) %>
     </tbody>

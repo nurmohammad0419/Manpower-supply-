@@ -42,6 +42,7 @@ const seed = db.transaction(() => {
   db.prepare(`UPDATE demands SET review_status = 'published', agreement_signed = 1, published_at = datetime('now'),
     worker_rate = ROUND(salary_amount * 0.8, 2), worker_rate_type = salary_type, worker_pay_days = 7, client_payment_days = 30
     WHERE company_id IN (?, ?)`).run(c1, c2);
+  db.prepare("UPDATE workers SET status = 'approved' WHERE user_id = ?").run(w);
 });
 seed();
 

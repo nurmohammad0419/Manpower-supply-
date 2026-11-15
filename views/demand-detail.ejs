@@ -36,11 +36,7 @@
   </div>
 
   <aside class="card apply-box">
-    <% if (isOwner) { %>
-      <h2><%= t('Your demand') %></h2>
-      <p class="muted"><%= t('This is how workers see the job post published by the admin.') %></p>
-      <a class="btn full" href="/company/demands/<%= demand.id %>"><%= t('Back to your demand') %></a>
-    <% } else if (!user) { %>
+    <% if (!user) { %>
       <h2><%= t('Apply for this job') %></h2>
       <p class="muted"><%= t('Log in or register as a worker to apply.') %></p>
       <a class="btn full" href="/login?next=/demands/<%= demand.id %>"><%= t('Login to apply') %></a>

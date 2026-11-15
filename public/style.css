@@ -241,3 +241,9 @@ tr.applies th, tr.applies td { background: var(--primary-soft); }
 .assigned { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .assigned:last-child { border-bottom: 0; }
 .pay-input { width: 110px; margin: 0; }
+
+/* Jobs visible only to approved workers */
+.jobs-locked { display: flex; gap: 18px; align-items: flex-start; padding: 24px; }
+.jobs-locked h2 { margin-top: 0; }
+.lock-icon { font-size: 2rem; }
+.approve-box { border: 1px dashed var(--border); border-radius: 10px; padding: 10px 14px; margin: 8px 0 16px; }

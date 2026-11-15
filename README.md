@@ -19,6 +19,10 @@ by the supply company, and every company demand is covered by a signed agreement
    terms: transport provided by ManpowerHub KSA for workers living in the job's city, accommodation and food for
    workers from other cities, plus free-text terms and conditions. The company name is hidden unless the admin
    chooses to show it. Publishing sends job alerts to workers with that position.
+   **Job posts are only visible to workers the admin has approved** (and to the admin). Visitors, companies and
+   workers waiting for approval cannot see any job or rate, so a company cannot learn the worker rate by registering
+   as a worker. A new worker can log in, complete the profile and upload documents, and is approved (or rejected
+   with a note) by the admin; the worker gets a message either way.
 4. **Workers apply to ManpowerHub KSA.** The admin shortlists and hires. The company only sees the workers assigned
    to it (profile, Iqama, documents) — never their phone number or e-mail — and cannot change a published demand.
 5. **Timesheets:** the company submits hours each month (amount owed from its rate). The admin sets each worker's pay
@@ -43,7 +47,7 @@ by the supply company, and every company demand is covered by a signed agreement
 - Payments page with payment slips and receipts
 
 **Admin (ManpowerHub KSA)**
-- Verify (approve / reject) companies
+- Verify (approve / reject) companies and workers
 - Review demands, sign agreements, publish job posts with the worker rate and terms, see the margin
 - Handle applications: shortlist, hire (assign to the company), reject — with notes to the worker
 - Check timesheets, set worker pay, pay workers, record company payments

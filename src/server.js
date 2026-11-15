@@ -66,6 +66,12 @@ function csrfToken(req) {
 
 app.use((req, res, next) => {
   res.locals.user = req.session.user || null;
+  // Job posts and worker rates are only for approved workers and the admin (so companies never see them).
+  const u = req.session.user;
+  req.workerStatus = u && u.role === 'worker' ? db.prepare('SELECT status FROM workers WHERE user_id = ?').get(u.id)?.status : null;
+  req.canSeeJobs = !!u && (u.role === 'admin' || req.workerStatus === 'approved');
+  res.locals.workerStatus = req.workerStatus;
+  res.locals.canSeeJobs = req.canSeeJobs;
   res.locals.flash = req.session.flash || null;
   delete req.session.flash;
   res.locals.csrf = csrfToken(req);
@@ -96,6 +102,21 @@ app.use((req, res, next) => {
   if (req.method === 'POST' && !req.is('multipart/form-data')) return checkCsrf(req, res, next);
   next();
 });
+
+// Job posts: approved workers and the admin only.
+function requireJobAccess(req, res, next) {
+  if (req.canSeeJobs) return next();
+  const u = req.session.user;
+  if (!u) {
+    flash(req, 'error', 'Please log in as an approved worker to see jobs.');
+    return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+  }
+  if (u.role === 'worker') {
+    flash(req, 'error', 'Your account is waiting for approval. You can see jobs after ManpowerHub KSA approves it.');
+    return res.redirect('/worker');
+  }
+  res.status(403).render('error', { title: 'Access denied', message: 'Job posts are only visible to approved workers.' });
+}
 
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -207,13 +228,13 @@ app.get('/', (req, res) => {
     companies: db.prepare("SELECT COUNT(*) n FROM companies WHERE status='approved'").get().n,
     workers: db.prepare('SELECT COUNT(*) n FROM workers').get().n,
   };
-  const latest = db.prepare(`
+  const latest = req.canSeeJobs ? db.prepare(`
     SELECT d.*, c.company_name, c.logo_file FROM demands d JOIN companies c ON c.user_id = d.company_id
-    WHERE d.status='open' AND c.status='approved' AND d.review_status='published' ORDER BY d.published_at DESC LIMIT 6`).all();
+    WHERE d.status='open' AND c.status='approved' AND d.review_status='published' ORDER BY d.published_at DESC LIMIT 6`).all() : [];
   res.render('home', { title: 'Home', stats, latest });
 });
 
-app.get('/demands', (req, res) => {
+app.get('/demands', requireJobAccess, (req, res) => {
   const q = str(req.query.q, 100);
   const category = str(req.query.category, 100);
   const city = str(req.query.city, 100);
@@ -231,12 +252,11 @@ app.get('/demands', (req, res) => {
   res.render('demands', { title: 'Job Demands', demands, filters: { q, category, city } });
 });
 
-app.get('/demands/:id', (req, res) => {
+app.get('/demands/:id', requireJobAccess, (req, res) => {
   const demand = getDemand(req.params.id);
   const u = req.session.user;
-  const isOwner = u && u.role === 'company' && demand && demand.company_id === u.id;
   const isPublic = demand && demand.status === 'open' && demand.company_status === 'approved' && demand.review_status === 'published';
-  const visible = isPublic || isOwner || (u && u.role === 'admin');
+  const visible = isPublic || (demand && u.role === 'admin');
   if (!visible) return res.status(404).render('error', { title: 'Not found', message: 'This demand does not exist or is no longer available.' });
   let application = null;
   let docs = [];
@@ -246,15 +266,14 @@ app.get('/demands/:id', (req, res) => {
     docs = db.prepare('SELECT DISTINCT doc_type FROM documents WHERE worker_id = ?').all(u.id).map((r) => r.doc_type);
     workerCity = db.prepare('SELECT city FROM workers WHERE user_id = ?').get(u.id).city;
   }
-  res.render('demand-detail', { title: demand.title, demand, application, workerDocTypes: docs, isOwner, workerCity });
+  res.render('demand-detail', { title: demand.title, demand, application, workerDocTypes: docs, workerCity });
 });
 
 // Printable job offer from the supply company, with the worker's terms (digital version of the paper demand).
-app.get('/demands/:id/letter', (req, res) => {
+app.get('/demands/:id/letter', requireJobAccess, (req, res) => {
   const demand = getDemand(req.params.id);
   const u = req.session.user;
-  const isOwner = u && u.role === 'company' && demand && demand.company_id === u.id;
-  if (!demand || !((demand.company_status === 'approved' && demand.review_status === 'published') || isOwner || (u && u.role === 'admin'))) {
+  if (!demand || !((demand.company_status === 'approved' && demand.review_status === 'published') || u.role === 'admin')) {
     return res.status(404).render('error', { title: 'Not found', message: 'Demand not found.' });
   }
   res.render('demand-letter', { title: 'Demand Letter', demand, layout: false });
@@ -340,7 +359,7 @@ app.post('/register/worker', (req, res) => {
   const id = tx();
   req.session.regenerate(() => {
     req.session.user = { id, role: 'worker', name: str(b.full_name, 200) };
-    flash(req, 'success', 'Welcome! Upload your documents (Iqama, Passport, Photo, CV) so you can apply to jobs quickly.');
+    flash(req, 'success', 'Registration complete. ManpowerHub KSA will check your details and approve your account. Meanwhile, please upload your Iqama, passport, photo and CV.');
     res.redirect('/worker/documents');
   });
 });
@@ -406,7 +425,7 @@ app.get('/worker', workerOnly, (req, res) => {
     FROM applications a JOIN demands d ON d.id = a.demand_id JOIN companies c ON c.user_id = d.company_id
     WHERE a.worker_id = ? ORDER BY a.updated_at DESC`).all(req.session.user.id);
   const docTypes = db.prepare('SELECT DISTINCT doc_type FROM documents WHERE worker_id = ?').all(req.session.user.id).map((r) => r.doc_type);
-  const recommended = db.prepare(`
+  const recommended = req.workerStatus !== 'approved' ? [] : db.prepare(`
     SELECT d.*, c.company_name, c.logo_file FROM demands d JOIN companies c ON c.user_id = d.company_id
     WHERE d.status='open' AND c.status='approved' AND (d.deadline IS NULL OR d.deadline = '' OR d.deadline >= date('now'))
       AND d.id NOT IN (SELECT demand_id FROM applications WHERE worker_id = ?)
@@ -470,7 +489,7 @@ app.post('/worker/profile', workerOnly, (req, res) => {
   res.redirect('/worker/profile');
 });
 
-app.post('/demands/:id/apply', workerOnly, handleUpload(docFields, (req) => '/demands/' + req.params.id), checkCsrf, (req, res) => {
+app.post('/demands/:id/apply', workerOnly, requireJobAccess, handleUpload(docFields, (req) => '/demands/' + req.params.id), checkCsrf, (req, res) => {
   const demand = getDemand(req.params.id);
   const workerId = req.session.user.id;
   const back = '/demands/' + req.params.id;
@@ -535,6 +554,7 @@ app.get('/admin', adminOnly, (req, res) => {
   const stats = {
     companies: db.prepare('SELECT COUNT(*) n FROM companies').get().n,
     pending: db.prepare("SELECT COUNT(*) n FROM companies WHERE status='pending'").get().n,
+    pendingWorkers: db.prepare("SELECT COUNT(*) n FROM workers WHERE status='pending'").get().n,
     workers: db.prepare('SELECT COUNT(*) n FROM workers').get().n,
     demands: db.prepare("SELECT COUNT(*) n FROM demands WHERE status='open'").get().n,
     applications: db.prepare('SELECT COUNT(*) n FROM applications').get().n,
@@ -548,7 +568,7 @@ app.get('/admin', adminOnly, (req, res) => {
   const workers = db.prepare(`SELECT w.*, u.email, u.phone, u.created_at,
     (SELECT COUNT(*) FROM documents x WHERE x.worker_id = w.user_id) AS doc_count,
     (SELECT COUNT(*) FROM applications a WHERE a.worker_id = w.user_id) AS app_count
-    FROM workers w JOIN users u ON u.id = w.user_id ORDER BY u.created_at DESC LIMIT 100`).all();
+    FROM workers w JOIN users u ON u.id = w.user_id ORDER BY (w.status = 'pending') DESC, u.created_at DESC LIMIT 200`).all();
   const demands = db.prepare(`SELECT d.*, c.company_name,
     (SELECT COUNT(*) FROM applications a WHERE a.demand_id = d.id AND a.status != 'withdrawn') AS applicant_count,
     (SELECT COUNT(*) FROM applications a WHERE a.demand_id = d.id AND a.status = 'hired') AS hired_count
@@ -568,6 +588,25 @@ app.post('/admin/companies/:id/status', adminOnly, (req, res) => {
   }
   flash(req, 'success', { approved: 'Company approved.', rejected: 'Company rejected.', pending: 'Company set to pending.' }[status]);
   res.redirect('/admin');
+});
+
+// Admin approves (or rejects) a worker account. Only approved workers can see jobs and get job alerts.
+app.post('/admin/workers/:id/status', adminOnly, (req, res) => {
+  const worker = db.prepare('SELECT * FROM workers WHERE user_id = ?').get(req.params.id);
+  if (!worker) return res.status(404).render('error', { title: 'Not found', message: 'Worker not found.' });
+  const status = req.body.status === 'approved' ? 'approved' : 'rejected';
+  const note = str(req.body.status_note, 500);
+  db.prepare('UPDATE workers SET status = ?, status_note = ? WHERE user_id = ?').run(status, note || null, worker.user_id);
+  if (status !== worker.status) {
+    if (status === 'approved') {
+      notifyUser(worker.user_id, 'ManpowerHub KSA: Your account has been approved. You can now see jobs and apply.', {}, '/demands');
+    } else {
+      notifyUser(worker.user_id, 'ManpowerHub KSA: Your registration could not be approved. {reason}', { reason: note }, '/worker');
+    }
+  }
+  if (status === 'approved') flash(req, 'success', 'Worker approved.');
+  else flash(req, 'success', 'Worker rejected.');
+  res.redirect(req.body.back === 'list' ? '/admin' : '/admin/workers/' + worker.user_id);
 });
 
 app.get('/admin/workers/:id', adminOnly, (req, res) => {

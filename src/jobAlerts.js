@@ -35,7 +35,7 @@ function announceDemand(demandId) {
   const workers = db.prepare(`
     SELECT DISTINCT p.worker_id FROM worker_positions p
     JOIN workers w ON w.user_id = p.worker_id JOIN users u ON u.id = w.user_id
-    WHERE p.category = ? AND w.job_alerts = 1 AND u.notify_channel != 'none'
+    WHERE p.category = ? AND w.status = 'approved' AND w.job_alerts = 1 AND u.notify_channel != 'none'
       AND p.worker_id NOT IN (SELECT worker_id FROM applications WHERE demand_id = ?)`).all(d.category, d.id);
 
   const params = {

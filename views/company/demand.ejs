@@ -8,7 +8,6 @@
   <div class="actions">
     <%- include('../partials/review-badge', { status: demand.review_status }) %>
     <% if (demand.review_status !== 'published') { %><a class="btn btn-alt" href="/company/demands/<%= demand.id %>/edit"><%= t('Edit') %></a><% } else { %>
-      <a class="btn btn-alt" href="/demands/<%= demand.id %>"><%= t('View public page') %></a>
       <a class="btn btn-alt" href="/company/timesheets"><%= t('Timesheets') %></a><% } %>
     <form method="post" action="/company/demands/<%= demand.id %>/status" class="inline">
       <input type="hidden" name="_csrf" value="<%= csrf %>">

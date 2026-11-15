@@ -90,7 +90,7 @@ test('a published demand shows the company logo when the admin shows the company
   await ctx.publish(admin, demandId, { show_company: '1', worker_rate: '10' });
   await waitForMessages(2); // company: "your demand is published"
   assert.match(JSON.parse(sent[1].body).text.body, /Your demand "Mason for school project" is confirmed and published/);
-  const list = await new Client().get('/demands');
+  const list = await admin.get('/demands');
   assert.ok(list.text.includes('/logos/' + logoFile));
 });
 
@@ -115,6 +115,7 @@ test('admin adds extra worker fields; required ones are enforced at registration
   assert.match(r.text, /&quot;Marital status&quot; পূরণ করুন/);
   r = await worker.post('/register/worker', { ...fields, ['cf_' + fieldId]: 'Married' }, '/register/worker');
   assert.strictEqual(r.location, '/worker/documents');
+  db.prepare("UPDATE workers SET status = 'approved'").run(); // (approval itself is tested in e2e)
 });
 
 test('worker adds more details; the admin sees them, the company only after the worker is assigned', async () => {

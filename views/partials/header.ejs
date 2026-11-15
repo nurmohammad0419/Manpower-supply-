@@ -11,7 +11,7 @@
   <div class="wrap topbar-inner">
     <a class="brand" href="/"><span class="logo">MH</span> ManpowerHub <small>KSA</small></a>
     <nav class="nav">
-      <a href="/demands" class="<%= path.startsWith('/demands') ? 'active' : '' %>"><%= t('Job Demands') %></a>
+      <% if (canSeeJobs) { %><a href="/demands" class="<%= path.startsWith('/demands') ? 'active' : '' %>"><%= t('Job Demands') %></a><% } %>
       <% if (!user) { %>
         <a href="/login"><%= t('Login') %></a>
         <a class="btn btn-sm" href="/register"><%= t('Register') %></a>

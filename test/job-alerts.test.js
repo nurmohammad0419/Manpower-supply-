@@ -6,6 +6,7 @@ const { startApp } = require('./support/harness');
 const ctx = startApp({ WHATSAPP_PROVIDER: 'meta', WHATSAPP_TOKEN: 't', WHATSAPP_PHONE_NUMBER_ID: '1', BASE_URL: 'https://jobs.example.com' });
 const { Client } = ctx;
 const notify = require('../src/notify');
+const db = require('../src/db');
 
 const sent = [];
 notify._setFetch(async (url, opts) => { sent.push(JSON.parse(opts.body)); return new Response('{}'); });
@@ -51,6 +52,9 @@ test('workers register with several positions', async () => {
   await registerWorker('dipu', { profession: 'Electrician', channel: 'none', phone: '0550000004' });
   await registerWorker('emon', { profession: 'Cook', positions: ['Electrician'], channel: 'sms', phone: '0550000005' });
 
+  db.prepare("UPDATE workers SET status = 'approved'").run();
+  // Registered but not approved by the admin: never gets job alerts.
+  await registerWorker('farid', { profession: 'Painter', phone: '0550000006' });
   const profile = await workers.anis.get('/worker/profile');
   for (const p of ['Electrician', 'Painter']) assert.match(profile.text, new RegExp(`value="${p}" checked`));
   assert.doesNotMatch(profile.text, /value="Plumber" checked/);

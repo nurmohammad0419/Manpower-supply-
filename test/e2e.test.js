@@ -49,6 +49,32 @@ test('duplicate email is refused', async () => {
   assert.match(r.text, /already exists/);
 });
 
+test('jobs are hidden from visitors, companies and workers until the admin approves the worker', async () => {
+  let r = await worker.post('/register/worker', {
+    full_name: 'Rahim Uddin', nationality: 'Bangladesh', profession: 'Electrician', experience_years: '5',
+    phone: '+966500000002', email: 'rahim@test.local', password: 'secret12', password_confirm: 'secret12',
+  });
+  assert.strictEqual(r.location, '/worker/documents');
+  assert.match((await worker.get('/worker/documents')).text, /will check your details and approve your account/);
+
+  // Visitor: sent to login. Company: not allowed. Waiting worker: sent back to the dashboard.
+  r = await new Client().get('/demands');
+  assert.match(r.location, /^\/login\?next=/);
+  assert.match((await new Client().get('/')).text, /Running jobs are only for registered workers/);
+  assert.strictEqual((await company.get('/demands')).status, 403);
+  r = await worker.get('/demands');
+  assert.strictEqual(r.location, '/worker');
+  assert.match((await worker.get('/worker')).text, /Your account is waiting for approval/);
+  assert.doesNotMatch((await worker.get('/')).text, /href="\/demands"/, 'no job menu yet');
+
+  await admin.post('/login', { email: 'admin@test.local', password: 'adminpass' }, '/login');
+  const page = await admin.get('/admin');
+  assert.match(page.text, /Waiting for approval/);
+  const id = /\/admin\/workers\/(\d+)\/status" class="inline quick" data-approve/.exec(page.text)[1];
+  await admin.post(`/admin/workers/${id}/status`, { status: 'approved' }, '/admin');
+  assert.strictEqual((await worker.get('/demands')).status, 200);
+});
+
 test('company posts a demand: it waits for the admin and is not public', async () => {
   const r = await company.post('/company/demands', {
     title: 'Electrician for villa project', category: 'Electrician', quantity: '1', salary_amount: '15',
@@ -61,40 +87,38 @@ test('company posts a demand: it waits for the admin and is not public', async (
   assert.match(page.text, /Demand sent\. The admin will confirm the terms/);
   assert.match(page.text, /Waiting for admin review/);
   assert.match(page.text, /45 days after month end/);
-  assert.doesNotMatch((await new Client().get('/demands')).text, /Electrician for villa project/);
-  assert.strictEqual((await new Client().get(`/demands/${demandId}`)).status, 404);
+  assert.doesNotMatch((await worker.get('/demands')).text, /Electrician for villa project/);
+  assert.strictEqual((await worker.get(`/demands/${demandId}`)).status, 404);
 });
 
 test('admin approves the company; the demand stays hidden until published', async () => {
-  let r = await admin.post('/login', { email: 'admin@test.local', password: 'adminpass' }, '/login');
-  assert.strictEqual(r.location, '/admin');
-  r = await admin.get('/admin');
+  let r = await admin.get('/admin');
   assert.match(r.text, /Al Noor Contracting/);
   const companyId = /\/admin\/companies\/(\d+)\/status/.exec(r.text)[1];
   r = await admin.post(`/admin/companies/${companyId}/status`, { status: 'approved' }, '/admin');
   assert.strictEqual(r.status, 302);
-  assert.doesNotMatch((await new Client().get('/demands')).text, /Electrician for villa project/);
+  assert.doesNotMatch((await worker.get('/demands')).text, /Electrician for villa project/);
 });
 
 test('admin cannot publish before the agreement is signed', async () => {
   const r = await ctx.publish(admin, demandId, { agreement_signed: '' });
   assert.strictEqual(r.location, `/admin/demands/${demandId}`);
   assert.match((await admin.get(r.location)).text, /only be published after the agreement with the company is signed/);
-  assert.doesNotMatch((await new Client().get('/demands')).text, /Electrician for villa project/);
+  assert.doesNotMatch((await worker.get('/demands')).text, /Electrician for villa project/);
 });
 
 test('admin signs the agreement and publishes the job with the worker rate and terms', async () => {
   const fd = { worker_rate: '11.5', worker_rate_type: 'hourly', worker_pay_days: '5', worker_terms: 'Probation one month.', agreement: undefined };
   const r = await ctx.publish(admin, demandId, fd);
   assert.match((await admin.get(r.location)).text, /Job published/);
-  const list = await new Client().get('/demands?category=Electrician');
+  const list = await worker.get('/demands?category=Electrician');
   assert.match(list.text, /Electrician for villa project/);
   assert.match(list.text, /11.5 SAR/);
   assert.doesNotMatch(list.text, /15 SAR/, 'company rate is never shown to workers');
   assert.doesNotMatch(list.text, /Al Noor Contracting/, 'company name hidden by default');
   assert.match(list.text, /Client company/);
-  assert.doesNotMatch((await new Client().get('/demands?q=Al+Noor')).text, /Electrician for villa project/);
-  const detail = await new Client().get(`/demands/${demandId}`);
+  assert.doesNotMatch((await worker.get('/demands?q=Al+Noor')).text, /Electrician for villa project/);
+  const detail = await worker.get(`/demands/${demandId}`);
   assert.match(detail.text, /Paid within 5 days after the end of each month/);
   assert.match(detail.text, /Transport to work provided by ManpowerHub KSA/);
   assert.match(detail.text, /Accommodation and food provided/);
@@ -104,10 +128,13 @@ test('admin signs the agreement and publishes the job with the worker rate and t
   assert.match(own.text, /Published/);
   assert.match(own.text, /Signed/);
   assert.doesNotMatch(own.text, /11\.5/);
+  // The company cannot open the worker job page or the job offer, so it never learns the worker rate.
+  assert.strictEqual((await company.get(`/demands/${demandId}`)).status, 403);
+  assert.strictEqual((await company.get(`/demands/${demandId}/letter`)).status, 403);
 });
 
 test('job offer letter is printable and issued by the supply company', async () => {
-  const r = await new Client().get(`/demands/${demandId}/letter`);
+  const r = await worker.get(`/demands/${demandId}/letter`);
   assert.strictEqual(r.status, 200);
   assert.match(r.text, /JOB OFFER/);
   assert.match(r.text, /11.5 SAR/);
@@ -120,12 +147,8 @@ test('company cannot change a published demand', async () => {
   assert.match((await company.get(r.location)).text, /already published/);
 });
 
-test('worker registers and uploads documents', async () => {
-  let r = await worker.post('/register/worker', {
-    full_name: 'Rahim Uddin', nationality: 'Bangladesh', profession: 'Electrician', experience_years: '5',
-    phone: '+966500000002', email: 'rahim@test.local', password: 'secret12', password_confirm: 'secret12',
-  });
-  assert.strictEqual(r.location, '/worker/documents');
+test('worker uploads documents', async () => {
+  let r;
 
   // A fake "image" that is really text must be rejected.
   const bad = new FormData();
@@ -203,6 +226,7 @@ test('cannot hire more than the demanded quantity', async () => {
     full_name: 'Karim', nationality: 'Nepal', profession: 'Electrician', phone: '3',
     email: 'karim@test.local', password: 'secret12', password_confirm: 'secret12',
   });
+  await ctx.approveWorkers(admin);
   const fd = new FormData();
   fd.append('doc_iqama', new Blob([PDF], { type: 'application/pdf' }), 'iqama.pdf');
   await worker2.post(`/demands/${demandId}/apply`, fd, `/demands/${demandId}`);
@@ -223,11 +247,11 @@ test('worker cannot open company pages and logout works', async () => {
 
 test('language menu switches the site language and direction', async () => {
   const c = new Client();
-  let r = await c.get('/lang?code=bn&next=/demands');
-  assert.strictEqual(r.location, '/demands');
-  r = await c.get('/demands');
+  let r = await c.get('/lang?code=bn&next=/register/worker');
+  assert.strictEqual(r.location, '/register/worker');
+  r = await c.get('/register/worker');
   assert.match(r.text, /<html lang="bn" dir="ltr">/);
-  assert.match(r.text, /কাজের ডিমান্ড/);
+  assert.match(r.text, /কর্মী রেজিস্ট্রেশন/);
   assert.match(r.text, /ইলেকট্রিশিয়ান/); // category name translated
 
   await c.get('/lang?code=ar&next=/');

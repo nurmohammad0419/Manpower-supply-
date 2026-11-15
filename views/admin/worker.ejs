@@ -1,7 +1,19 @@
 <%- include('../partials/header') %>
 <div class="crumbs"><a href="/admin"><span class="arr">←</span> <%= t('Admin') %></a></div>
 <div class="card">
-  <h1><bdi><%= worker.full_name %></bdi></h1>
+  <div class="section-head">
+    <h1><bdi><%= worker.full_name %></bdi></h1>
+    <%- include('../partials/worker-status-badge', { status: worker.status }) %>
+  </div>
+  <form method="post" action="/admin/workers/<%= worker.user_id %>/status" class="approve-box">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <p class="hint"><%= t('Check the details and documents (Iqama, passport). Only approved workers can see jobs, apply and get job alerts.') %></p>
+    <label><%= t('Note to the worker (shown if rejected)') %> <input name="status_note" maxlength="500" value="<%= worker.status_note || '' %>"></label>
+    <div class="actions">
+      <% if (worker.status !== 'approved') { %><button name="status" value="approved" class="btn"><%= t('Approve') %></button><% } %>
+      <% if (worker.status !== 'rejected') { %><button name="status" value="rejected" class="btn btn-danger"><%= t('Reject') %></button><% } %>
+    </div>
+  </form>
   <table class="kv">
     <tr><th><%= t('Nationality') %></th><td><%= t(worker.nationality) %></td></tr>
     <tr><th><%= t('Profession') %></th><td><%= t(worker.profession) %> (<%= t('{n} years', { n: worker.experience_years }) %>)</td></tr>
