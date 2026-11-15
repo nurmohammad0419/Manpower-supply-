@@ -1,0 +1,135 @@
+<%- include('../partials/header') %>
+<h1><%= t('Money management') %></h1>
+<p class="muted"><%= t('All amounts in SAR, from timesheets you confirmed and the expenses you entered.') %></p>
+
+<div class="stats stats-row money-cards">
+  <div class="stat"><b><%= money(total.billed) %></b><span><%= t('Billed to companies') %></span></div>
+  <div class="stat good"><b><%= money(total.received) %></b><span><%= t('Received from companies') %></span></div>
+  <div class="stat <%= total.outstanding > 0 ? 'bad' : '' %>"><b><%= money(total.outstanding) %></b><span><%= t('Still due from companies') %></span></div>
+  <div class="stat <%= total.overdue > 0 ? 'bad' : '' %>"><b><%= money(total.overdue) %></b><span><%= t('Overdue from companies') %></span></div>
+</div>
+<div class="stats stats-row money-cards">
+  <div class="stat"><b><%= money(total.pay) %></b><span><%= t('Worker salaries earned') %></span></div>
+  <div class="stat good"><b><%= money(total.paid) %></b><span><%= t('Paid to workers') %></span></div>
+  <div class="stat <%= total.unpaid > 0 ? 'bad' : '' %>"><b><%= money(total.unpaid) %></b><span><%= t('Still to pay workers') %></span></div>
+  <div class="stat"><b><%= money(total.checking) %></b><span><%= t('Waiting for worker check') %></span></div>
+</div>
+<div class="stats stats-row money-cards">
+  <div class="stat"><b><%= money(total.margin) %></b><span><%= t('Margin (billed − worker salaries)') %></span></div>
+  <div class="stat"><b><%= money(total.expenses) %></b><span><%= t('Expenses') %></span></div>
+  <div class="stat <%= total.profit >= 0 ? 'good' : 'bad' %>"><b><%= money(total.profit) %></b><span><%= total.profit >= 0 ? t('Profit') : t('Loss') %> (<%= t('on work done') %>)</span></div>
+  <div class="stat <%= total.cashProfit >= 0 ? 'good' : 'bad' %>"><b><%= money(total.cashProfit) %></b><span><%= t('Cash in hand (received − paid − expenses)') %></span></div>
+</div>
+
+<div class="tabs">
+  <% [['companies', 'Companies'], ['workers', 'Workers'], ['expenses', 'Expenses'], ['months', 'By month']].forEach(([k, v]) => { %>
+    <a href="?tab=<%= k %>" class="<%= tab === k ? 'active' : '' %>"><%= t(v) %></a>
+  <% }) %>
+</div>
+
+<% if (tab === 'companies') { %>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Company') %></th><th class="num"><%= t('Billed') %></th><th class="num"><%= t('Received') %></th><th class="num"><%= t('Still due') %></th><th class="num"><%= t('Overdue') %></th><th class="num"><%= t('Worker salaries') %></th><th class="num"><%= t('Not yet paid to workers') %></th><th class="num"><%= t('Margin') %></th></tr></thead>
+    <tbody>
+    <% if (!companies.length) { %><tr><td colspan="8" class="muted"><%= t('No confirmed timesheets yet.') %></td></tr><% } %>
+    <% companies.forEach(c => { %>
+      <tr>
+        <td><bdi><%= c.name %></bdi></td>
+        <td class="num"><%= money(c.billed) %></td><td class="num"><%= money(c.received) %></td>
+        <td class="num"><b><%= money(c.outstanding) %></b></td><td class="num <%= c.overdue ? 'danger-text' : '' %>"><%= money(c.overdue) %></td>
+        <td class="num"><%= money(c.pay) %></td><td class="num"><%= money(c.unpaidWorkers) %></td><td class="num"><%= money(c.margin) %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+
+<% if (tab === 'workers') { %>
+<h2><%= t('Worker balances') %></h2>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Worker') %></th><th class="num"><%= t('Earned') %></th><th class="num"><%= t('Paid') %></th><th class="num"><%= t('Still to pay') %></th><th><%= t('Unpaid work at') %></th></tr></thead>
+    <tbody>
+    <% if (!workers.length) { %><tr><td colspan="5" class="muted"><%= t('No confirmed timesheets yet.') %></td></tr><% } %>
+    <% workers.forEach(w => { %>
+      <tr><td><a href="/admin/workers/<%= w.worker_id %>"><bdi><%= w.name %></bdi></a></td><td class="num"><%= money(w.earned) %></td><td class="num"><%= money(w.paid) %></td>
+        <td class="num"><b><%= money(w.pending) %></b></td><td class="small"><bdi><%= w.companies || '—' %></bdi></td></tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<h2><%= t('Unpaid salaries') %></h2>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Worker') %></th><th><%= t('Company') %></th><th><%= t('Month') %></th><th class="num"><%= t('Amount (SAR)') %></th><th><%= t('Worker check') %></th><th><%= t('Payment date') %></th></tr></thead>
+    <tbody>
+    <% if (!unpaidLines.length) { %><tr><td colspan="6" class="muted"><%= t('All workers are paid.') %></td></tr><% } %>
+    <% unpaidLines.forEach(l => { %>
+      <tr><td><bdi><%= l.full_name %></bdi></td><td><bdi><%= l.company_name %></bdi><div class="small muted"><bdi><%= l.demand_title %></bdi></div></td>
+        <td><a href="/admin/timesheets/<%= l.timesheet_id %>"><%= fmtMonth(l.month) %></a></td><td class="num"><b><%= money(l.pay) %></b></td>
+        <td><%- include('../partials/check-badge', { status: l.worker_status }) %></td><td><%= l.pay_planned_at ? fmtDate(l.pay_planned_at) : '—' %></td></tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+
+<% if (tab === 'expenses') { %>
+<div class="detail">
+  <div class="card table-wrap">
+    <table class="table">
+      <thead><tr><th><%= t('Date') %></th><th><%= t('Type') %></th><th><%= t('For') %></th><th class="num"><%= t('Amount (SAR)') %></th><th></th></tr></thead>
+      <tbody>
+      <% if (!expenses.length) { %><tr><td colspan="5" class="muted"><%= t('No expenses yet.') %></td></tr><% } %>
+      <% expenses.forEach(e => { %>
+        <tr>
+          <td class="nowrap"><%= fmtDate(e.spent_on) %></td>
+          <td><%= t(EXPENSE_CATEGORIES[e.category] || e.category) %><% if (e.note) { %><div class="small muted"><bdi><%= e.note %></bdi></div><% } %></td>
+          <td class="small"><bdi><%= [e.company_name, e.full_name].filter(Boolean).join(' · ') || '—' %></bdi></td>
+          <td class="num"><b><%= money(e.amount) %></b></td>
+          <td><form method="post" action="/admin/expenses/<%= e.id %>/delete" data-confirm="<%= t('Delete this expense?') %>" onsubmit="return confirm(this.dataset.confirm)">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linklike danger small"><%= t('Delete') %></button></form></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <aside class="card">
+    <h2><%= t('Add an expense') %></h2>
+    <form method="post" action="/admin/expenses">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label><%= t('Date') %> * <input type="date" name="spent_on" required value="<%= new Date().toISOString().slice(0, 10) %>"></label>
+      <label><%= t('Type') %> *
+        <select name="category" required><% Object.entries(EXPENSE_CATEGORIES).forEach(([k, v]) => { %><option value="<%= k %>"><%= t(v) %></option><% }) %></select>
+      </label>
+      <label><%= t('Amount (SAR)') %> * <input type="number" name="amount" min="0.01" step="0.01" required></label>
+      <label><%= t('For a company (optional)') %>
+        <select name="company_id"><option value="">—</option><% companyList.forEach(c => { %><option value="<%= c.user_id %>"><%= c.company_name %></option><% }) %></select>
+      </label>
+      <label><%= t('For a worker (optional)') %>
+        <select name="worker_id"><option value="">—</option><% workerList.forEach(w => { %><option value="<%= w.user_id %>"><%= w.full_name %></option><% }) %></select>
+      </label>
+      <label><%= t('Note (optional)') %> <input name="note" maxlength="500" placeholder="<%= t('e.g. Iqama renewal for 3 workers') %>"></label>
+      <button class="btn full"><%= t('Add expense') %></button>
+    </form>
+  </aside>
+</div>
+<% } %>
+
+<% if (tab === 'months') { %>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Month') %></th><th class="num"><%= t('Billed') %></th><th class="num"><%= t('Worker salaries') %></th><th class="num"><%= t('Expenses') %></th><th class="num"><%= t('Profit / loss') %></th></tr></thead>
+    <tbody>
+    <% if (!months.length) { %><tr><td colspan="5" class="muted"><%= t('No data yet.') %></td></tr><% } %>
+    <% months.forEach(m => { %>
+      <tr><td><%= fmtMonth(m.month) %></td><td class="num"><%= money(m.billed) %></td><td class="num"><%= money(m.pay) %></td><td class="num"><%= money(m.expenses) %></td>
+        <td class="num <%= m.profit < 0 ? 'danger-text' : 'good-text' %>"><b><%= money(m.profit) %></b></td></tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+<%- include('../partials/footer') %>

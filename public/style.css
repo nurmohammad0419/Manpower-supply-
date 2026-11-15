@@ -247,3 +247,27 @@ tr.applies th, tr.applies td { background: var(--primary-soft); }
 .jobs-locked h2 { margin-top: 0; }
 .lock-icon { font-size: 2rem; }
 .approve-box { border: 1px dashed var(--border); border-radius: 10px; padding: 10px 14px; margin: 8px 0 16px; }
+
+/* Worker timesheet check */
+.pay-card h2 { margin: 0; }
+.pay-card.needs-check { border-color: var(--accent); }
+.check-box { background: var(--warn-soft); border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+.check-box .btn { margin: 4px 4px 4px 0; }
+.problem summary { list-style: none; display: inline-block; }
+.problem summary::-webkit-details-marker { display: none; }
+.problem form { margin-top: 8px; }
+.thread { background: var(--bg); border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: .92rem; }
+.thread.reply.resolved { background: var(--primary-soft); }
+.thread.reply.unresolvable { background: var(--danger-soft); }
+.reply-form { margin-top: 8px; min-width: 260px; }
+.reply-form label { font-size: .85rem; margin: 6px 0; }
+.notices { list-style: none; padding: 0; margin: 0; }
+.notices li { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .92rem; }
+.notices li:last-child { border-bottom: 0; }
+.money-cards .stat b { font-size: 1.3rem; }
+.stat.good b { color: var(--primary); }
+.stat.bad b { color: var(--danger); }
+.join-box { border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 12px; }
+td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; }
+.danger-text { color: var(--danger); }
+.good-text { color: var(--primary); }

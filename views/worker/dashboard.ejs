@@ -10,6 +10,15 @@
   <div class="alert alert-warn"><%= t('Complete your profile to apply faster — missing: {docs}.', { docs: missing.map(m => t(DOC_TYPES[m])).join(', ') }) %> <a href="/worker/documents"><%= t('Upload now') %> <span class="arr">→</span></a></div>
 <% } %>
 
+<% if (notices.length) { %>
+<h2><%= t('Notices from ManpowerHub KSA') %></h2>
+<div class="card">
+  <ul class="notices">
+    <% notices.forEach(n => { %><li><div class="small muted"><%= fmtDateTime(n.created_at) %></div><span class="prewrap" dir="auto"><%= n.body %></span></li><% }) %>
+  </ul>
+</div>
+<% } %>
+
 <h2><%= t('My applications') %></h2>
 <% if (!applications.length) { %>
   <div class="card empty"><%= t('You have not applied to any job yet.') %> <% if (worker.status === 'approved') { %><a href="/demands"><%= t('Browse demands') %> <span class="arr">→</span></a><% } %></div>

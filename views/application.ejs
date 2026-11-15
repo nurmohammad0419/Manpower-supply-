@@ -37,6 +37,17 @@
   </div>
   <% if (locals.canDecide) { %>
   <aside class="card apply-box">
+    <% if (a.status === 'hired') { %>
+      <div class="join-box">
+        <h2><%= t('Joining') %></h2>
+        <% if (a.joined_at) { %><p><b><%= t('Joined on {date}', { date: fmtDate(a.joined_at) }) %></b></p><% } else { %><p class="small muted"><%= t('After the worker starts work, save the joining date. Only joined workers can be put on timesheets.') %></p><% } %>
+        <form method="post" action="/admin/applications/<%= a.id %>/joined" class="inline-form">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label><%= t('Joined work on') %> <input type="date" name="joined_at" required value="<%= a.joined_at || new Date().toISOString().slice(0, 10) %>"></label>
+          <button class="btn btn-sm"><%= t('Save') %></button>
+        </form>
+      </div>
+    <% } %>
     <h2><%= t('Decision') %></h2>
     <% if (a.status === 'withdrawn') { %>
       <p class="muted"><%= t('The worker withdrew this application.') %></p>

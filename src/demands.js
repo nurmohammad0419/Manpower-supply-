@@ -115,7 +115,7 @@ module.exports = function demandRoutes(app, deps) {
   });
 
   const assignedWorkers = (demandId) => db.prepare(`
-    SELECT a.id AS application_id, a.updated_at, w.user_id, w.full_name, w.nationality, w.profession, w.experience_years, w.iqama_number
+    SELECT a.id AS application_id, a.updated_at, a.joined_at, w.user_id, w.full_name, w.nationality, w.profession, w.experience_years, w.iqama_number
     FROM applications a JOIN workers w ON w.user_id = a.worker_id
     WHERE a.demand_id = ? AND a.status = 'hired' ORDER BY w.full_name`).all(demandId);
 
@@ -246,6 +246,22 @@ module.exports = function demandRoutes(app, deps) {
       title: worker.full_name, a, worker, documents, extras: workerExtras(a.worker_id), positions: jobAlerts.workerPositions(a.worker_id),
       showContact: true, canDecide: true, back: '/admin/demands/' + a.demand_id,
     });
+  });
+
+  // The hired worker started work: from now on the worker can be put on timesheets.
+  app.post('/admin/applications/:id/joined', adminOnly, (req, res) => {
+    const a = loadApplication(req.params.id);
+    if (!a) return notFound(res, 'Application not found.');
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(req.body.joined_at || '') ? req.body.joined_at : null;
+    if (a.status !== 'hired' || !date) {
+      flash(req, 'error', 'Please choose the date the worker joined.');
+      return res.redirect('/admin/applications/' + a.id);
+    }
+    db.prepare('UPDATE applications SET joined_at = ? WHERE id = ?').run(date, a.id);
+    const name = db.prepare('SELECT full_name FROM workers WHERE user_id = ?').get(a.worker_id).full_name;
+    notifyUser(a.company_id, 'ManpowerHub KSA: {name} joined work for "{job}" on {date}.', { name, job: a.demand_title, date }, '/company/demands/' + a.demand_id);
+    flash(req, 'success', 'Joining date saved.');
+    res.redirect('/admin/applications/' + a.id);
   });
 
   app.post('/admin/applications/:id/status', adminOnly, (req, res) => {

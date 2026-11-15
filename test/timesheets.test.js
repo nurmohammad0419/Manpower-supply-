@@ -59,6 +59,11 @@ test('setup: company hires two workers', async () => {
   for (const m of list.text.matchAll(/\/admin\/applications\/(\d+)"/g)) {
     await admin.post(`/admin/applications/${m[1]}/status`, { status: 'hired' }, '/admin');
   }
+  // Hired but not joined yet: not on the timesheet form.
+  assert.doesNotMatch((await company.get(`/company/timesheets/new?demand=${demandId}`)).text, /name="hours_/);
+  for (const m of list.text.matchAll(/\/admin\/applications\/(\d+)"/g)) {
+    await admin.post(`/admin/applications/${m[1]}/joined`, { joined_at: '2026-11-01' }, '/admin/applications/' + m[1]);
+  }
   const formPage = await company.get(`/company/timesheets/new?demand=${demandId}`);
   for (const m of formPage.text.matchAll(/<bdi>(\w+)<\/bdi>[\s\S]*?name="hours_(\d+)"/g)) ids[m[1].toLowerCase()] = m[2];
   assert.ok(ids.rahim && ids.karim, 'both hired workers listed');
@@ -141,7 +146,7 @@ test('admin sets worker pay from the worker rate and confirms; each worker gets 
   assert.match(toRahim[0], /260 ঘণ্টা/);
   assert.match(toRahim[0], /3,120.00 রিয়াল/);
   assert.match(toRahim[0], /ব্যাংক ট্রান্সফার/);
-  assert.match(toKarim[0], /confirmed: 19 days, 190 hours, 2,300.00 SAR\. Payment by Bank transfer: Payment pending\./);
+  assert.match(toKarim[0], /: 19 days, 190 hours, 2,300.00 SAR \(payment by Bank transfer\)\. Please check it within 48 hours/);
 
   const adminView = await admin.get(`/admin/timesheets/${tsId}`);
   assert.match(adminView.text, /5,420.00/); // worker pay total
@@ -159,13 +164,24 @@ test('admin sets worker pay from the worker rate and confirms; each worker gets 
 test('worker sees the payment; the admin pays with a receipt; worker is told and can print the slip', async () => {
   let r = await karim.get('/worker/payments');
   assert.match(r.text, /2,300.00/);
-  assert.match(r.text, /Payment pending/);
-  const lineId = /\/payslips\/(\d+)/.exec(r.text)[1];
+  assert.match(r.text, /Waiting for worker check/);
+  assert.match(r.text, /Please check your hours and pay/);
+  const lineId = /\/worker\/timesheet-lines\/(\d+)\/confirm/.exec(r.text)[1];
   assert.strictEqual((await rahim.get('/payslips/' + lineId)).status, 404, "another worker's slip is private");
 
   r = await company.post(`/timesheet-lines/${lineId}/paid`, await form({}), `/company/timesheets/${tsId}`);
   assert.strictEqual(r.status, 403, 'the supply company pays workers, not the client company');
-  const page = await admin.get(`/admin/timesheets/${tsId}`);
+  // Not payable until the worker has confirmed the timesheet.
+  let page = await admin.get(`/admin/timesheets/${tsId}`);
+  assert.ok(!page.text.includes(`/timesheet-lines/${lineId}/paid`));
+  r = await admin.post(`/timesheet-lines/${lineId}/paid`, await form({}), `/admin/timesheets/${tsId}`);
+  assert.match((await admin.get(r.location)).text, /The worker has not confirmed this timesheet yet/);
+  await karim.post(`/worker/timesheet-lines/${lineId}/confirm`, {}, '/worker/payments');
+  // Notice before paying.
+  await admin.post(`/admin/timesheets/${tsId}/pay-notice`, { pay_date: '2026-12-02' }, `/admin/timesheets/${tsId}`);
+  await settle();
+  assert.match(messagesTo('966551000002').at(-1), /salary of 2,300.00 SAR for .* will be paid on 2026-12-02 by Bank transfer/);
+  page = await admin.get(`/admin/timesheets/${tsId}`);
   assert.ok(page.text.includes(`/timesheet-lines/${lineId}/paid`));
   r = await admin.post(`/timesheet-lines/${lineId}/paid`, await form({ paid_at: '2026-12-02', payment_ref: 'TRX-55821' }, { proof: [PDF, 'receipt.pdf'] }), `/admin/timesheets/${tsId}`);
   assert.strictEqual(r.location, `/admin/timesheets/${tsId}`);

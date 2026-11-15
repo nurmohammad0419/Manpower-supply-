@@ -47,6 +47,7 @@
       <div class="assigned">
         <a href="/company/assigned/<%= w.application_id %>"><b><bdi><%= w.full_name %></bdi></b></a>
         <div class="small muted"><%= t(w.profession) %> · <%= t(w.nationality) %> · <%= t('Iqama No.') %> <%= w.iqama_number || '—' %></div>
+        <div class="small"><%= w.joined_at ? t('Joined on {date}', { date: fmtDate(w.joined_at) }) : t('Not joined yet') %></div>
       </div>
     <% }) %>
   </div>

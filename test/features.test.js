@@ -179,8 +179,10 @@ test('failed and switched-off messages are recorded; admin can see them', async 
   assert.strictEqual(sent.length, 5);
 
   const rows = db.prepare('SELECT status, error FROM notifications ORDER BY id').all();
-  assert.deepStrictEqual(rows.map((x) => x.status), ['sent', 'sent', 'sent', 'sent', 'failed']);
+  // The last message is still stored (shown to the worker as a notice) but not sent.
+  assert.deepStrictEqual(rows.map((x) => x.status), ['sent', 'sent', 'sent', 'sent', 'failed', 'not_sent']);
   assert.match(rows[4].error, /HTTP 400/);
+  assert.match(rows[5].error, /switched off/);
   const r = await admin.get('/admin');
   assert.match(r.text, /WhatsApp \/ SMS messages/);
   assert.match(r.text, /badge-rejected">Failed/);

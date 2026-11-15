@@ -39,13 +39,22 @@
   </form>
 <% } %>
 
+<% const readyToPay = lines.filter(l => l.worker_status === 'confirmed' && l.payment_status !== 'paid'); %>
+<% if (isAdmin && ts.status === 'confirmed' && readyToPay.length) { %>
+  <form method="post" action="/admin/timesheets/<%= ts.id %>/pay-notice" class="card inline-form">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label><%= t('Tell the workers before paying: salary will be paid on') %> <input type="date" name="pay_date" required value="<%= new Date().toISOString().slice(0, 10) %>"></label>
+    <button class="btn btn-alt"><%= t('Send payment notice ({n} workers)', { n: readyToPay.length }) %></button>
+  </form>
+<% } %>
+
 <% if (reviewing) { %><form method="post" action="/admin/timesheets/<%= ts.id %>/review" id="review-form"><input type="hidden" name="_csrf" value="<%= csrf %>"></form><% } %>
 <div class="card table-wrap">
   <table class="table">
     <thead><tr>
       <th><%= t('Worker') %></th><th><%= t('Days worked') %></th><th><%= t('Hours') %></th>
       <th><%= isAdmin ? t('Company amount (SAR)') : t('Amount you owe (SAR)') %></th>
-      <% if (isAdmin) { %><th><%= t('Worker pay (SAR)') %></th><th><%= t('Payment') %></th><% } %>
+      <% if (isAdmin) { %><th><%= t('Worker pay (SAR)') %></th><th><%= t('Worker check') %></th><th><%= t('Payment') %></th><% } %>
     </tr></thead>
     <tbody>
     <% lines.forEach(l => { %>
@@ -59,13 +68,40 @@
           <td class="nowrap">
             <% if (reviewing) { %><input type="number" form="review-form" name="pay_<%= l.id %>" min="0" step="0.01" value="<%= suggest(l) %>" class="pay-input"><% } else if (ts.status === 'confirmed') { %><b><%= money(l.pay) %></b><% } else { %>—<% } %>
           </td>
+          <td class="check-cell">
+            <% if (ts.status !== 'confirmed') { %>—<% } else { %>
+              <%- include('partials/check-badge', { status: l.worker_status }) %>
+              <% if (['awaiting', 'answered'].includes(l.worker_status) && l.worker_deadline) { %><div class="small muted"><%= t('until {date}', { date: fmtDateTime(l.worker_deadline) }) %></div><% } %>
+              <% if (l.auto_confirmed) { %><div class="small muted"><%= t('Confirmed automatically') %></div><% } %>
+              <% if (l.worker_note) { %><div class="thread small"><b><%= t('Worker') %>:</b> <span class="prewrap" dir="auto"><bdi><%= l.worker_note %></bdi></span></div><% } %>
+              <% if (l.admin_reply) { %><div class="thread reply small <%= l.reply_result %>"><b><%= l.reply_result === 'resolved' ? t('Solved') : t('Could not be solved') %>:</b> <span class="prewrap" dir="auto"><bdi><%= l.admin_reply %></bdi></span></div><% } %>
+              <% if (l.worker_status === 'disputed') { %>
+                <form method="post" action="/admin/timesheet-lines/<%= l.id %>/reply" class="reply-form">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <label><%= t('Answer to the worker') %> <textarea name="admin_reply" rows="2" maxlength="1000" required></textarea></label>
+                  <div class="row2">
+                    <label><%= t('Days worked') %> <input type="number" name="days_worked" min="0" max="31" placeholder="<%= l.days_worked %>"></label>
+                    <label><%= t('Hours') %> <input type="number" name="hours" min="0" step="0.25" placeholder="<%= l.hours %>"></label>
+                  </div>
+                  <div class="row2">
+                    <label><%= t('Worker pay (SAR)') %> <input type="number" name="worker_amount" min="0" step="0.01" placeholder="<%= l.pay %>"></label>
+                    <label><%= t('Company amount (SAR)') %> <input type="number" name="amount" min="0" step="0.01" placeholder="<%= l.amount %>"></label>
+                  </div>
+                  <p class="hint"><%= t('Fill in only the numbers you correct.') %></p>
+                  <button name="reply_result" value="resolved" class="btn btn-sm"><%= t('Solved') %></button>
+                  <button name="reply_result" value="unresolvable" class="btn btn-sm btn-danger"><%= t('Could not be solved') %></button>
+                </form>
+              <% } %>
+            <% } %>
+          </td>
           <td>
             <% if (ts.status !== 'confirmed') { %>—<% } else { %>
             <%- include('partials/pay-badge', { status: l.payment_status }) %>
+            <% if (l.pay_planned_at && l.payment_status !== 'paid') { %><div class="small muted"><%= t('Payment date') %>: <%= fmtDate(l.pay_planned_at) %></div><% } %>
             <% if (l.payment_status === 'paid') { %>
               <div class="small muted"><%= fmtDate(l.paid_at) %><%= l.payment_ref ? ' · ' : '' %><bdi><%= l.payment_ref %></bdi></div>
               <div class="small"><a href="/payslips/<%= l.id %>" target="_blank"><%= t('Payment slip') %></a><% if (l.proof_file) { %> · <a href="/timesheet-lines/<%= l.id %>/proof" target="_blank"><%= t('Receipt') %></a><% } %></div>
-            <% } else { %>
+            <% } else if (l.worker_status === 'confirmed') { %>
               <details class="pay-form">
                 <summary class="btn btn-sm"><%= t('Mark as paid') %></summary>
                 <form method="post" action="/timesheet-lines/<%= l.id %>/paid" enctype="multipart/form-data">

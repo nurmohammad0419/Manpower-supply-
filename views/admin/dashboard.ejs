@@ -12,6 +12,7 @@
   <div class="stat"><b><%= stats.demands %></b><span><%= t('Open demands') %></span></div>
   <div class="stat"><b><%= stats.applications %></b><span><%= t('Applications') %></span></div>
   <div class="stat"><b><%= stats.hired %></b><span><%= t('Hired') %></span></div>
+  <a class="stat stat-link" href="/admin/timesheets"><b><%= stats.problems %></b><span><%= t('Timesheet problems reported') %></span></a>
   <a class="stat stat-link" href="/admin/demands?review=pending"><b><%= stats.toReview %></b><span><%= t('Demands to review') %></span></a>
   <a class="stat stat-link" href="/admin/timesheets?status=submitted"><b><%= stats.timesheets %></b><span><%= t('Timesheets to check') %></span></a>
 </div>

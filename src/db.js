@@ -235,6 +235,39 @@ addColumn('timesheet_lines', 'worker_amount', 'REAL'); // what the worker is pai
 // Workers need the admin's approval before they can see jobs. Workers registered before this existed stay approved.
 if (addColumn('workers', 'status', "TEXT NOT NULL DEFAULT 'pending'")) db.exec("UPDATE workers SET status = 'approved'");
 addColumn('workers', 'status_note', 'TEXT');
+
+// The admin records when a hired worker actually joined work. Only joined workers appear on timesheets.
+if (addColumn('applications', 'joined_at', 'TEXT')) {
+  db.exec("UPDATE applications SET joined_at = date(updated_at) WHERE status = 'hired'");
+}
+
+// After the admin approves a timesheet, each worker has 48 hours to confirm it or report a problem.
+// worker_status: awaiting → (disputed → answered →) confirmed. Lines confirm automatically after the deadline.
+if (addColumn('timesheet_lines', 'worker_status', "TEXT NOT NULL DEFAULT 'awaiting'")) {
+  db.exec("UPDATE timesheet_lines SET worker_status = 'confirmed' WHERE timesheet_id IN (SELECT id FROM timesheets WHERE status = 'confirmed')");
+}
+addColumn('timesheet_lines', 'worker_deadline', 'TEXT');
+addColumn('timesheet_lines', 'worker_note', 'TEXT');
+addColumn('timesheet_lines', 'admin_reply', 'TEXT');
+addColumn('timesheet_lines', 'reply_result', 'TEXT');
+addColumn('timesheet_lines', 'worker_confirmed_at', 'TEXT');
+addColumn('timesheet_lines', 'auto_confirmed', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('timesheet_lines', 'pay_planned_at', 'TEXT');
+
+// The supply company's own costs (kafala, visas, accommodation, staff, ...), for profit and loss.
+db.exec(`
+CREATE TABLE IF NOT EXISTS expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  spent_on TEXT NOT NULL,
+  category TEXT NOT NULL,
+  amount REAL NOT NULL CHECK (amount >= 0),
+  note TEXT,
+  company_id INTEGER REFERENCES companies(user_id) ON DELETE SET NULL,
+  worker_id INTEGER REFERENCES workers(user_id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_expenses_spent_on ON expenses(spent_on);
+`);
 addColumn('timesheets', 'client_due_date', 'TEXT'); // when the company must pay the supplier
 addColumn('timesheets', 'client_paid_at', 'TEXT');
 // Workers registered before positions existed: their main profession is their position.

@@ -8,6 +8,7 @@ const { hashPassword, verifyPassword } = require('./lib/password');
 const {
   CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES,
   KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES, TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REVIEW_STATUS,
+  WORKER_CHECK, EXPENSE_CATEGORIES,
 } = require('./constants');
 const { notifyUser } = require('./notify');
 const jobAlerts = require('./jobAlerts');
@@ -80,8 +81,13 @@ app.use((req, res, next) => {
   Object.assign(res.locals, {
     CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES, LANGUAGES,
     KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES, TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REVIEW_STATUS,
+    WORKER_CHECK, EXPENSE_CATEGORIES,
   });
   res.locals.fmtMonth = (ym) => formatMonth(ym, req.lang);
+  // Date and time in Saudi time (stored times are UTC).
+  res.locals.fmtDateTime = (s) => (s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleString(lang.locale + '-u-nu-latn', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh',
+  }) : '—');
   res.locals.money = formatMoney;
   res.locals.escapeHtml = escapeHtml;
   const t = req.t;
@@ -431,7 +437,9 @@ app.get('/worker', workerOnly, (req, res) => {
       AND d.id NOT IN (SELECT demand_id FROM applications WHERE worker_id = ?)
     ORDER BY (d.category IN (SELECT category FROM worker_positions WHERE worker_id = ?)) DESC, d.created_at DESC LIMIT 4`)
     .all(req.session.user.id, req.session.user.id);
-  res.render('worker/dashboard', { title: 'My Dashboard', worker, applications, docTypes, recommended });
+  // Every message ManpowerHub KSA sent the worker, also shown here as notices (even when WhatsApp / SMS is off).
+  const notices = db.prepare('SELECT body, created_at FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 15').all(req.session.user.id);
+  res.render('worker/dashboard', { title: 'My Dashboard', worker, applications, docTypes, recommended, notices });
 });
 
 app.get('/worker/documents', workerOnly, (req, res) => {
@@ -561,6 +569,7 @@ app.get('/admin', adminOnly, (req, res) => {
     hired: db.prepare("SELECT COUNT(*) n FROM applications WHERE status='hired'").get().n,
     timesheets: db.prepare("SELECT COUNT(*) n FROM timesheets WHERE status='submitted'").get().n,
     toReview: db.prepare("SELECT COUNT(*) n FROM demands WHERE review_status='pending'").get().n,
+    problems: db.prepare("SELECT COUNT(*) n FROM timesheet_lines WHERE worker_status='disputed'").get().n,
   };
   const companies = db.prepare(`SELECT c.*, u.email, u.phone, u.created_at,
     (SELECT COUNT(*) FROM demands d WHERE d.company_id = c.user_id) AS demand_count
@@ -656,6 +665,9 @@ app.post('/admin/fields/:id/delete', adminOnly, (req, res) => {
 
 // ---------- Timesheets & payments ----------
 require('./timesheets')(app, { db, flash, requireRole, handleUpload, checkCsrf, str, int, notifyUser, UPLOAD_DIR });
+
+// ---------- Money management (admin) ----------
+require('./money')(app, { db, flash, requireRole, str });
 
 // ---------- Errors ----------
 app.use((req, res) => res.status(404).render('error', { title: 'Not found', message: 'Page not found.' }));

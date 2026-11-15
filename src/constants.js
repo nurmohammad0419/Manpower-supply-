@@ -59,9 +59,17 @@ const TIMESHEET_STATUS = { submitted: 'Waiting for admin check', confirmed: 'Con
 const PAYMENT_METHODS = { bank: 'Bank transfer', cash: 'Cash' };
 const PAYMENT_STATUS = { pending: 'Payment pending', paid: 'Paid' };
 const REVIEW_STATUS = { pending: 'Waiting for admin review', published: 'Published', rejected: 'Needs changes' };
+// Worker's check of an approved timesheet line.
+const WORKER_CHECK = {
+  awaiting: 'Waiting for worker check', disputed: 'Problem reported', answered: 'Admin replied', confirmed: 'Confirmed by worker',
+};
+const EXPENSE_CATEGORIES = {
+  kafala: 'Kafala / Iqama fees', visa: 'Visa & travel', accommodation: 'Accommodation', food: 'Food', transport: 'Transport',
+  medical: 'Medical & insurance', staff: 'Office staff salaries', office: 'Office & rent', other: 'Other',
+};
 
 module.exports = {
   CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES,
   KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
-  TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REVIEW_STATUS,
+  TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REVIEW_STATUS, WORKER_CHECK, EXPENSE_CATEGORIES,
 };

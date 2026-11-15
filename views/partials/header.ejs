@@ -30,6 +30,7 @@
           <a href="/admin"><%= t('Admin') %></a>
           <a href="/admin/demands" class="<%= path.startsWith('/admin/demands') ? 'active' : '' %>"><%= t('Demands') %></a>
           <a href="/admin/timesheets" class="<%= path.startsWith('/admin/timesheets') ? 'active' : '' %>"><%= t('Timesheets') %></a>
+          <a href="/admin/money" class="<%= path.startsWith('/admin/money') ? 'active' : '' %>"><%= t('Money') %></a>
         <% } %>
         <form method="post" action="/logout" class="inline">
           <input type="hidden" name="_csrf" value="<%= csrf %>">

@@ -25,11 +25,22 @@ by the supply company, and every company demand is covered by a signed agreement
    with a note) by the admin; the worker gets a message either way.
 4. **Workers apply to ManpowerHub KSA.** The admin shortlists and hires. The company only sees the workers assigned
    to it (profile, Iqama, documents) — never their phone number or e-mail — and cannot change a published demand.
-5. **Timesheets:** the company submits hours each month (amount owed from its rate). The admin sets each worker's pay
-   from the worker rate and the payment method, confirms, and workers are told their hours, pay and status. The
-   company's payment due date is calculated from the agreed days; the admin records when the company pays.
-6. **Payments:** the admin pays the workers, marks them paid (with optional receipt) and workers get a message and a
-   printable payment slip issued by ManpowerHub KSA.
+5. **Joining:** after hiring, the admin records the date the worker joined work. Only joined workers can be put on
+   timesheets.
+6. **Timesheets:** the company submits hours each month (amount owed from its rate). The admin sets each worker's pay
+   from the worker rate and the payment method, and approves it. The company's payment due date is calculated from
+   the agreed days; the admin records when the company pays.
+7. **Worker check (48 hours):** each worker is told their days, hours and pay and has 48 hours to confirm it or write
+   the problem. The admin answers — "solved" (and can correct days, hours, worker pay and company amount) or "could
+   not be solved" — and the worker is told and gets another 48 hours. Without an answer the line confirms itself.
+   Only confirmed lines can be paid. (Set `WORKER_CHECK_HOURS` to change the 48 hours.)
+8. **Payments:** the admin sends a notice before paying ("your salary will be paid on …"), pays the workers, marks them
+   paid (with optional receipt) and workers get a message and a printable payment slip issued by ManpowerHub KSA.
+   Every message is also shown to the worker as a notice on the dashboard, even when WhatsApp / SMS is off.
+9. **Money management (admin "Money" tab):** billed to companies, received, still due and overdue; worker salaries
+   earned, paid and still to pay (per worker, with the company the unpaid work was for); expenses (kafala/Iqama,
+   visas, accommodation, food, transport, medical, staff, office, other — optionally for a company or worker); margin,
+   profit or loss on work done, cash in hand, and a month-by-month profit / loss table.
 
 ## Features
 
@@ -50,7 +61,8 @@ by the supply company, and every company demand is covered by a signed agreement
 - Verify (approve / reject) companies and workers
 - Review demands, sign agreements, publish job posts with the worker rate and terms, see the margin
 - Handle applications: shortlist, hire (assign to the company), reject — with notes to the worker
-- Check timesheets, set worker pay, pay workers, record company payments
+- Record joining dates; check timesheets, set worker pay, answer worker problems, send payment notices, pay workers, record company payments
+- **Money** tab with the complete accounts and expenses
 - **Worker profile fields**: add any extra question for workers (text, number, date, yes/no or a choice list; optional or required)
 - Log of every WhatsApp / SMS message and whether it was sent
 
@@ -127,7 +139,8 @@ src/i18n.js          language list and translation lookup
 src/notify.js        WhatsApp / SMS messages (Meta, Twilio)
 src/timesheets.js    monthly timesheets, admin check, payments, payment slips
 src/jobAlerts.js     worker positions and new-job alerts
-src/demands.js       company demands, admin review / agreement / publishing, applications
+src/demands.js       company demands, admin review / agreement / publishing, applications, joining
+src/money.js         money management: accounts, expenses, profit / loss
 src/locales/*.json   translations (English text → translated text)
 src/lib/web.js       small built-in web framework (routing, sessions, uploads)
 src/lib/template.js  EJS-style templates

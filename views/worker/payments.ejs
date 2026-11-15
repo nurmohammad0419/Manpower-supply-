@@ -2,31 +2,58 @@
 <h1><%= t('My payments') %></h1>
 <div class="stats stats-row">
   <div class="stat"><b><%= totals.hours %></b><span><%= t('Hours') %></span></div>
-  <div class="stat"><b><%= money(totals.paid) %></b><span><%= t('Paid (SAR)') %></span></div>
+  <div class="stat"><b><%= money(totals.checking) %></b><span><%= t('Waiting for your check (SAR)') %></span></div>
   <div class="stat"><b><%= money(totals.pending) %></b><span><%= t('Payment pending (SAR)') %></span></div>
+  <div class="stat"><b><%= money(totals.paid) %></b><span><%= t('Paid (SAR)') %></span></div>
 </div>
 <% if (!lines.length) { %>
   <div class="card empty"><%= t('No confirmed timesheets yet. When your company uploads your timesheet and the admin confirms it, it appears here.') %></div>
-<% } else { %>
-<div class="card table-wrap">
-  <table class="table">
-    <thead><tr><th><%= t('Month') %></th><th><%= t('Company') %></th><th><%= t('Days worked') %></th><th><%= t('Hours') %></th><th><%= t('Amount (SAR)') %></th><th><%= t('Payment') %></th><th></th></tr></thead>
-    <tbody>
-    <% lines.forEach(l => { %>
-      <tr>
-        <td class="nowrap"><b><%= fmtMonth(l.month) %></b></td>
-        <td><div class="company-line"><% if (l.show_company) { %><%- include('../partials/logo', { file: l.logo_file, size: 'sm' }) %><bdi><%= l.company_name %></bdi><% } else { %><%= t('Client company') %><% } %></div><div class="small muted"><bdi><%= l.demand_title %></bdi></div></td>
-        <td><%= l.days_worked %></td>
-        <td><%= l.hours %></td>
-        <td class="nowrap"><b><%= money(l.pay) %></b></td>
-        <td><%= t(PAYMENT_METHODS[l.payment_method]) %><br><%- include('../partials/pay-badge', { status: l.payment_status }) %>
-          <% if (l.paid_at) { %><div class="small muted"><%= fmtDate(l.paid_at) %></div><% } %></td>
-        <td class="nowrap small"><a href="/payslips/<%= l.id %>" target="_blank"><%= t('Payment slip') %></a>
-          <% if (l.proof_file) { %><br><a href="/timesheet-lines/<%= l.id %>/proof" target="_blank"><%= t('Receipt') %></a><% } %></td>
-      </tr>
-    <% }) %>
-    </tbody>
-  </table>
-</div>
 <% } %>
+<% lines.forEach(l => { const open = ['awaiting', 'answered'].includes(l.worker_status); %>
+  <div class="card pay-card <%= open ? 'needs-check' : '' %>">
+    <div class="section-head">
+      <div>
+        <h2><%= fmtMonth(l.month) %></h2>
+        <div class="small muted company-line"><% if (l.show_company) { %><%- include('../partials/logo', { file: l.logo_file, size: 'sm' }) %><bdi><%= l.company_name %></bdi><% } else { %><%= t('Client company') %><% } %> · <bdi><%= l.demand_title %></bdi></div>
+      </div>
+      <div class="actions">
+        <%- include('../partials/check-badge', { status: l.worker_status }) %>
+        <% if (l.worker_status === 'confirmed') { %><%- include('../partials/pay-badge', { status: l.payment_status }) %><% } %>
+      </div>
+    </div>
+    <table class="kv">
+      <tr><th><%= t('Days worked') %></th><td><%= l.days_worked %></td></tr>
+      <tr><th><%= t('Hours') %></th><td><%= l.hours %></td></tr>
+      <tr><th><%= t('Amount (SAR)') %></th><td><b><%= money(l.pay) %></b> · <%= t(PAYMENT_METHODS[l.payment_method]) %></td></tr>
+      <% if (l.pay_planned_at && l.payment_status !== 'paid') { %><tr><th><%= t('Payment date') %></th><td><%= fmtDate(l.pay_planned_at) %></td></tr><% } %>
+      <% if (l.paid_at) { %><tr><th><%= t('Paid') %></th><td><%= fmtDate(l.paid_at) %>
+        · <a href="/payslips/<%= l.id %>" target="_blank"><%= t('Payment slip') %></a><% if (l.proof_file) { %> · <a href="/timesheet-lines/<%= l.id %>/proof" target="_blank"><%= t('Receipt') %></a><% } %></td></tr><% } %>
+    </table>
+
+    <% if (l.worker_note) { %><div class="thread"><b><%= t('Your problem') %>:</b> <span class="prewrap" dir="auto"><bdi><%= l.worker_note %></bdi></span></div><% } %>
+    <% if (l.admin_reply) { %><div class="thread reply <%= l.reply_result %>"><b><%= l.reply_result === 'resolved' ? t('Solved') : t('Could not be solved') %>:</b> <span class="prewrap" dir="auto"><bdi><%= l.admin_reply %></bdi></span></div><% } %>
+    <% if (l.worker_status === 'disputed') { %><p class="small muted"><%= t('ManpowerHub KSA is checking your problem. You will get an answer.') %></p><% } %>
+    <% if (l.auto_confirmed) { %><p class="small muted"><%= t('Confirmed automatically because the time to check ended.') %></p><% } %>
+
+    <% if (open) { %>
+      <div class="check-box">
+        <p><b><%= t('Please check your hours and pay.') %></b> <%= t('Confirm before {date}, or write the problem. If you do nothing, it is confirmed automatically.', { date: fmtDateTime(l.worker_deadline) }) %></p>
+        <form method="post" action="/worker/timesheet-lines/<%= l.id %>/confirm" class="inline">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="btn"><%= t('Yes, it is correct — confirm') %></button>
+        </form>
+        <details class="problem">
+          <summary class="btn btn-alt"><%= t('There is a problem') %></summary>
+          <form method="post" action="/worker/timesheet-lines/<%= l.id %>/problem">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <label><%= t('Write the problem') %>
+              <textarea name="worker_note" rows="3" maxlength="2000" required placeholder="<%= t('e.g. I worked 26 days, not 24. I also worked 10 hours overtime.') %>"></textarea>
+            </label>
+            <button class="btn btn-danger"><%= t('Send to ManpowerHub KSA') %></button>
+          </form>
+        </details>
+      </div>
+    <% } %>
+  </div>
+<% }) %>
 <%- include('../partials/footer') %>

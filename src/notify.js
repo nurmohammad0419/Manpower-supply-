@@ -90,7 +90,8 @@ const update = db.prepare('UPDATE notifications SET status = ?, error = ? WHERE 
 async function notifyUser(userId, key, params = {}, link = '') {
   try {
     const user = db.prepare('SELECT id, phone, lang, notify_channel FROM users WHERE id = ?').get(userId);
-    if (!user || !['whatsapp', 'sms'].includes(user.notify_channel)) return;
+    if (!user) return;
+    const off = !['whatsapp', 'sms'].includes(user.notify_channel);
     const t = translator(user.lang);
     params = Object.fromEntries(Object.entries(params).map(([k, v]) => [k,
       v && typeof v === 'object' ? (v.tr ? t(v.tr) : formatMonth(v.month, user.lang)) : v]));
@@ -100,7 +101,9 @@ async function notifyUser(userId, key, params = {}, link = '') {
 
     const to = normalizePhone(user.phone);
     const provider = providerFor(user.notify_channel);
-    const problem = !to ? 'Phone number is not in international format' : !provider ? `No ${user.notify_channel} provider configured` : null;
+    // The message is always stored (workers see it as a notice on their dashboard); it is only sent when possible.
+    const problem = off ? 'Messages switched off by the user'
+      : !to ? 'Phone number is not in international format' : !provider ? `No ${user.notify_channel} provider configured` : null;
     const row = insert.run(user.id, user.notify_channel, to || String(user.phone || ''), body, problem ? 'not_sent' : 'pending', problem);
     if (problem) return;
     try {
