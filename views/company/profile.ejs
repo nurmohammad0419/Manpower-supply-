@@ -2,13 +2,23 @@
 <div class="card medium">
   <h1><%= t('Company profile') %></h1>
   <p><%= t('Verification status') %>: <span class="badge badge-<%= form.status === 'approved' ? 'hired' : form.status === 'rejected' ? 'rejected' : 'applied' %>"><%= t({ approved: 'Approved', rejected: 'Rejected', pending: 'Pending' }[form.status]) %></span></p>
-  <form method="post" action="/company/profile">
+  <form method="post" action="/company/profile" enctype="multipart/form-data">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <%- include('../partials/company-fields', { lockCr: true }) %>
+    <div class="label"><%= t('Company logo (optional)') %></div>
+    <div class="logo-edit">
+      <% if (form.logo_file) { %>
+        <%- include('../partials/logo', { file: form.logo_file, size: 'lg' }) %>
+        <label class="check"><input type="checkbox" name="remove_logo" value="1"> <%= t('Remove logo') %></label>
+      <% } %>
+      <input type="file" name="logo" accept="image/png,image/jpeg,image/webp">
+    </div>
+    <span class="hint"><%= t('JPG, PNG or WEBP, max 2 MB. Shown on your job demands.') %></span>
     <div class="row2">
       <label><%= t('Email') %> <input value="<%= form.email %>" disabled dir="ltr"></label>
       <label><%= t('Phone') %> <input name="phone" value="<%= form.phone || '' %>" dir="ltr"></label>
     </div>
+    <%- include('../partials/notify-field') %>
     <button class="btn"><%= t('Save') %></button>
   </form>
 </div>

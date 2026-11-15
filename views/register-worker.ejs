@@ -6,7 +6,9 @@
   <form method="post" action="/register/worker">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <fieldset><legend><%= t('Personal details') %></legend><%- include('partials/worker-fields') %></fieldset>
+    <% if (fields.length) { %><fieldset><legend><%= t('More details') %></legend><%- include('partials/custom-fields') %></fieldset><% } %>
     <%- include('partials/account-fields') %>
+    <%- include('partials/notify-field') %>
     <button class="btn full"><%= t('Register') %></button>
   </form>
 </div>

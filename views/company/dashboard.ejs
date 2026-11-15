@@ -1,6 +1,6 @@
 <%- include('../partials/header') %>
 <div class="section-head">
-  <h1><bdi><%= company.company_name %></bdi></h1>
+  <h1 class="company-line"><%- include('../partials/logo', { file: company.logo_file, size: 'lg' }) %><bdi><%= company.company_name %></bdi></h1>
   <a class="btn" href="/company/demands/new"><%= t('+ Post new demand') %></a>
 </div>
 <% if (company.status === 'pending') { %>

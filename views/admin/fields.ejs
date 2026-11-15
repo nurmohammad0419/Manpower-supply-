@@ -1,0 +1,46 @@
+<%- include('../partials/header') %>
+<div class="crumbs"><a href="/admin"><span class="arr">←</span> <%= t('Admin') %></a></div>
+<h1><%= t('Worker profile fields') %></h1>
+<p class="muted"><%= t('Add any extra information you want workers to fill in. It appears in the worker registration form and profile, and companies see the answers when the worker applies.') %></p>
+<div class="detail">
+  <div class="card table-wrap">
+    <table class="table">
+      <thead><tr><th><%= t('Field') %></th><th><%= t('Type') %></th><th><%= t('Answers') %></th><th><%= t('Status') %></th><th></th></tr></thead>
+      <tbody>
+      <% if (!fields.length) { %><tr><td colspan="5" class="muted"><%= t('No extra fields yet.') %></td></tr><% } %>
+      <% fields.forEach(f => { %>
+        <tr>
+          <td><b><bdi><%= f.label %></bdi></b><%= f.required ? ' *' : '' %><% if (f.options) { %><div class="small muted"><bdi><%= f.options %></bdi></div><% } %></td>
+          <td><%= t(FIELD_TYPES[f.field_type]) %></td>
+          <td><%= f.answers %></td>
+          <td><span class="badge badge-<%= f.active ? 'hired' : 'withdrawn' %>"><%= t(f.active ? 'Active' : 'Hidden') %></span></td>
+          <td class="nowrap">
+            <form method="post" action="/admin/fields/<%= f.id %>/toggle" class="inline">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-sm btn-alt"><%= t(f.active ? 'Hide' : 'Show') %></button>
+            </form>
+            <form method="post" action="/admin/fields/<%= f.id %>/delete" class="inline" data-confirm="<%= t('Delete this field and all answers?') %>" onsubmit="return confirm(this.dataset.confirm)">
+              <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-sm btn-danger"><%= t('Delete') %></button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <aside class="card">
+    <h2><%= t('Add a field') %></h2>
+    <form method="post" action="/admin/fields">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label><%= t('Field name') %> * <input name="label" required maxlength="100" placeholder="<%= t('e.g. Height (cm)') %>"></label>
+      <label><%= t('Type') %>
+        <select name="field_type">
+          <% Object.entries(FIELD_TYPES).forEach(([k, v]) => { %><option value="<%= k %>"><%= t(v) %></option><% }) %>
+        </select>
+      </label>
+      <label><%= t('Choices (for a choice list, separated by commas)') %> <input name="options" maxlength="1000" placeholder="<%= t('e.g. Single, Married') %>"></label>
+      <label class="check"><input type="checkbox" name="required" value="1"> <%= t('Workers must fill this in') %></label>
+      <button class="btn full"><%= t('Add field') %></button>
+    </form>
+  </aside>
+</div>
+<%- include('../partials/footer') %>

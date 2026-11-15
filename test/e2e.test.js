@@ -2,62 +2,12 @@
 // worker registers, uploads documents, applies → company reviews documents and hires.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const http = require('http');
+const { startApp, PNG, PDF } = require('./support/harness');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'manpower-test-'));
-process.env.DATA_DIR = path.join(tmp, 'data');
-process.env.UPLOAD_DIR = path.join(tmp, 'uploads');
-process.env.ADMIN_EMAIL = 'admin@test.local';
-process.env.ADMIN_PASSWORD = 'adminpass';
-
-const app = require('../src/server');
-let server;
-let base;
-
-before(async () => {
-  server = http.createServer(app.handle);
-  await new Promise((r) => server.listen(0, r));
-  base = `http://127.0.0.1:${server.address().port}`;
-});
-after(() => { server.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
-
-class Client {
-  constructor() { this.jar = {}; }
-  async req(method, url, body) {
-    const headers = {};
-    const cookie = Object.entries(this.jar).map(([k, v]) => `${k}=${v}`).join('; ');
-    if (cookie) headers.cookie = cookie;
-    let payload;
-    if (body instanceof FormData) payload = body;
-    else if (body) { payload = new URLSearchParams(body).toString(); headers['content-type'] = 'application/x-www-form-urlencoded'; }
-    const res = await fetch(base + url, { method, headers, body: payload, redirect: 'manual' });
-    for (const c of res.headers.getSetCookie()) {
-      const [pair] = c.split(';');
-      const i = pair.indexOf('=');
-      this.jar[pair.slice(0, i)] = pair.slice(i + 1);
-    }
-    const text = await res.text();
-    return { status: res.status, location: res.headers.get('location'), text, headers: res.headers };
-  }
-  get(url) { return this.req('GET', url); }
-  async csrf(url = '/login') {
-    const r = await this.get(url);
-    const m = /name="_csrf" value="([a-f0-9]+)"/.exec(r.text);
-    assert.ok(m, 'csrf token on ' + url);
-    return m[1];
-  }
-  async post(url, fields, from = '/login') {
-    const _csrf = await this.csrf(from);
-    if (fields instanceof FormData) { fields.append('_csrf', _csrf); return this.req('POST', url, fields); }
-    return this.req('POST', url, { ...fields, _csrf });
-  }
-}
-
-const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex');
-const PDF = Buffer.from('%PDF-1.4\n%test\n');
+const ctx = startApp();
+const { Client } = ctx;
+before(ctx.start);
+after(ctx.stop);
 
 const company = new Client();
 const worker = new Client();

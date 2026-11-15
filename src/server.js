@@ -4,13 +4,18 @@ const crypto = require('crypto');
 const db = require('./db');
 const web = require('./lib/web');
 const { hashPassword, verifyPassword } = require('./lib/password');
-const { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES } = require('./constants');
+const {
+  CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES,
+  KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
+} = require('./constants');
+const { notifyUser } = require('./notify');
 const { LANGUAGES, translator, pickLanguage } = require('./i18n');
 
 const app = web.createApp();
 const PORT = Number(process.env.PORT) || 3000;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const LOGO_DIR = path.join(UPLOAD_DIR, 'logos');
+fs.mkdirSync(LOGO_DIR, { recursive: true });
 
 app.set('views', path.join(__dirname, '..', 'views'));
 app.use(web.serveStatic(path.join(__dirname, '..', 'public')));
@@ -21,19 +26,21 @@ app.use((req, res, next) => {
   req.t = translator(req.lang);
   next();
 });
+app.use(web.urlencoded());
+app.use(web.sessions({ db, maxAgeMs: 1000 * 60 * 60 * 24 * 7, secure: process.env.COOKIE_SECURE === '1' }));
 app.get('/lang', (req, res) => {
   const code = LANGUAGES[req.query.code] ? req.query.code : 'en';
   const nextUrl = String(req.query.next || '/');
+  // Logged-in users also get their WhatsApp / SMS messages in this language.
+  if (req.session.user) db.prepare('UPDATE users SET lang = ? WHERE id = ?').run(code, req.session.user.id);
   res.set('Set-Cookie', `lang=${code}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`);
   res.redirect(nextUrl.startsWith('/') && !nextUrl.startsWith('//') ? nextUrl : '/');
 });
-app.use(web.urlencoded());
-app.use(web.sessions({ db, maxAgeMs: 1000 * 60 * 60 * 24 * 7, secure: process.env.COOKIE_SECURE === '1' }));
 
 // ---------- File uploads ----------
 // Wrap the upload parser so upload errors become flash messages instead of error pages.
-function handleUpload(fieldNames, back) {
-  const mw = web.upload({ dir: UPLOAD_DIR, maxFileSize: 5 * 1024 * 1024, maxFiles: 10, allowedFields: fieldNames });
+function handleUpload(fieldNames, back, opts = {}) {
+  const mw = web.upload({ dir: UPLOAD_DIR, maxFileSize: 5 * 1024 * 1024, maxFiles: 10, allowedFields: fieldNames, ...opts });
   return (req, res, next) => mw(req, res, (err) => {
     if (!err) return next();
     if (!err.userError) return next(err);
@@ -60,7 +67,10 @@ app.use((req, res, next) => {
   res.locals.csrf = csrfToken(req);
   res.locals.path = req.path;
   res.locals.currentUrl = req.originalUrl;
-  Object.assign(res.locals, { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES, LANGUAGES });
+  Object.assign(res.locals, {
+    CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES, LANGUAGES,
+    KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
+  });
   const t = req.t;
   const lang = LANGUAGES[req.lang];
   Object.assign(res.locals, { t, lang: req.lang, dir: lang.dir });
@@ -98,7 +108,7 @@ const int = (v, def = 0) => (Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) 
 
 function getDemand(id) {
   return db.prepare(`
-    SELECT d.*, c.company_name, c.city AS company_city, c.cr_number, c.contact_person, c.status AS company_status,
+    SELECT d.*, c.company_name, c.logo_file, c.city AS company_city, c.cr_number, c.contact_person, c.status AS company_status,
       (SELECT COUNT(*) FROM applications a WHERE a.demand_id = d.id AND a.status != 'withdrawn') AS applicant_count,
       (SELECT COUNT(*) FROM applications a WHERE a.demand_id = d.id AND a.status = 'hired') AS hired_count
     FROM demands d JOIN companies c ON c.user_id = d.company_id
@@ -120,6 +130,63 @@ function saveDocuments(workerId, files) {
 }
 
 const docFields = Object.keys(DOC_TYPES).map((k) => 'doc_' + k);
+const logoUpload = { dir: LOGO_DIR, maxFileSize: 2 * 1024 * 1024, maxFiles: 1, allowedMimes: ['image/jpeg', 'image/png', 'image/webp'] };
+const removeLogo = (file) => { if (file) fs.rm(path.join(LOGO_DIR, file), { force: true }, () => {}); };
+const notifyChannel = (v) => (NOTIFY_CHANNELS[v] ? v : 'whatsapp');
+
+// ---------- Extra worker fields defined by the admin ----------
+const activeFields = () => db.prepare('SELECT * FROM custom_fields WHERE active = 1 ORDER BY sort, id').all();
+
+function fieldValues(workerId) {
+  return Object.fromEntries(db.prepare('SELECT field_id, value FROM worker_field_values WHERE worker_id = ?').all(workerId).map((r) => [r.field_id, r.value]));
+}
+
+// Read and check the extra fields from a submitted form. Returns { values, error }.
+function readCustomFields(req) {
+  const values = [];
+  for (const f of activeFields()) {
+    const v = str(req.body['cf_' + f.id], 1000);
+    const options = f.options.split(',').map((o) => o.trim()).filter(Boolean);
+    const bad = v && ((f.field_type === 'number' && !Number.isFinite(Number(v)))
+      || (f.field_type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(v))
+      || (f.field_type === 'yesno' && !['yes', 'no'].includes(v))
+      || (f.field_type === 'select' && !options.includes(v)));
+    if (bad) return { error: req.t('Please check "{field}".', { field: f.label }) };
+    if (f.required && !v) return { error: req.t('Please fill in "{field}".', { field: f.label }) };
+    values.push({ id: f.id, value: v });
+  }
+  return { values };
+}
+
+function customFormValues(body) {
+  return Object.fromEntries(Object.entries(body).filter(([k]) => k.startsWith('cf_')).map(([k, v]) => [k.slice(3), v]));
+}
+
+function saveCustomFields(workerId, values) {
+  const put = db.prepare('INSERT INTO worker_field_values (worker_id, field_id, value) VALUES (?,?,?) ON CONFLICT(worker_id, field_id) DO UPDATE SET value = excluded.value');
+  const del = db.prepare('DELETE FROM worker_field_values WHERE worker_id = ? AND field_id = ?');
+  for (const { id, value } of values) {
+    if (value) put.run(workerId, id, value);
+    else del.run(workerId, id);
+  }
+}
+
+// Filled-in extra fields of a worker, for companies and the admin to read.
+function workerExtras(workerId) {
+  return db.prepare(`SELECT f.label, f.field_type, v.value FROM worker_field_values v JOIN custom_fields f ON f.id = v.field_id
+    WHERE v.worker_id = ? AND f.active = 1 ORDER BY f.sort, f.id`).all(workerId);
+}
+
+function workerExtraColumns(b) {
+  return {
+    iqama_expiry: str(b.iqama_expiry, 10), passport_expiry: str(b.passport_expiry, 10),
+    kafala_transfer: KAFALA_OPTIONS[b.kafala_transfer] ? b.kafala_transfer : '',
+    languages: str(b.languages, 300),
+    driving_license: DRIVING_OPTIONS[b.driving_license] ? b.driving_license : '',
+    expected_salary: str(b.expected_salary, 100), available_from: str(b.available_from, 10),
+    work_history: str(b.work_history, 3000),
+  };
+}
 
 // ---------- Public pages ----------
 app.get('/', (req, res) => {
@@ -130,7 +197,7 @@ app.get('/', (req, res) => {
     workers: db.prepare('SELECT COUNT(*) n FROM workers').get().n,
   };
   const latest = db.prepare(`
-    SELECT d.*, c.company_name FROM demands d JOIN companies c ON c.user_id = d.company_id
+    SELECT d.*, c.company_name, c.logo_file FROM demands d JOIN companies c ON c.user_id = d.company_id
     WHERE d.status='open' AND c.status='approved' ORDER BY d.created_at DESC LIMIT 6`).all();
   res.render('home', { title: 'Home', stats, latest });
 });
@@ -145,7 +212,7 @@ app.get('/demands', (req, res) => {
   if (category) { where.push('d.category = ?'); params.push(category); }
   if (city) { where.push('d.location_city = ?'); params.push(city); }
   const demands = db.prepare(`
-    SELECT d.*, c.company_name,
+    SELECT d.*, c.company_name, c.logo_file,
       (SELECT COUNT(*) FROM applications a WHERE a.demand_id = d.id AND a.status = 'hired') AS hired_count
     FROM demands d JOIN companies c ON c.user_id = d.company_id
     WHERE ${where.join(' AND ')} ORDER BY d.created_at DESC LIMIT 200`).all(...params);
@@ -178,10 +245,20 @@ app.get('/demands/:id/letter', (req, res) => {
   res.render('demand-letter', { title: 'Demand Letter', demand, layout: false });
 });
 
+// Company logos are public (they appear on job demands).
+app.get('/logos/:file', (req, res) => {
+  const file = req.params.file;
+  if (!/^[\w.-]+$/.test(file) || !db.prepare('SELECT 1 FROM companies WHERE logo_file = ?').get(file)) {
+    return res.status(404).send('Not found');
+  }
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  res.sendFile(path.join(LOGO_DIR, file));
+});
+
 // ---------- Auth ----------
 app.get('/register', (req, res) => res.render('register-choice', { title: 'Register' }));
 app.get('/register/company', (req, res) => res.render('register-company', { title: 'Company Registration', form: {} }));
-app.get('/register/worker', (req, res) => res.render('register-worker', { title: 'Worker Registration', form: {} }));
+app.get('/register/worker', (req, res) => res.render('register-worker', { title: 'Worker Registration', form: {}, fields: activeFields(), values: {} }));
 
 function validateAccount(body) {
   const email = str(body.email, 200).toLowerCase();
@@ -193,20 +270,24 @@ function validateAccount(body) {
   return null;
 }
 
-app.post('/register/company', (req, res) => {
+app.post('/register/company', handleUpload(['logo'], '/register/company', logoUpload), checkCsrf, (req, res) => {
   const b = req.body;
+  const logo = req.files?.logo?.[0]?.filename || null;
   const err = validateAccount(b)
     || (!str(b.company_name) && 'Company name is required.')
     || (!str(b.cr_number) && 'Commercial Registration (CR) number is required.')
     || (!str(b.contact_person) && 'Contact person is required.')
     || (!str(b.city) && 'City is required.')
     || (!str(b.phone) && 'Phone number is required.');
-  if (err) return res.status(400).render('register-company', { title: 'Company Registration', form: b, error: err });
+  if (err) {
+    removeLogo(logo);
+    return res.status(400).render('register-company', { title: 'Company Registration', form: b, error: err });
+  }
   const tx = db.transaction(() => {
-    const info = db.prepare('INSERT INTO users (role, email, phone, password_hash, name) VALUES (?,?,?,?,?)')
-      .run('company', str(b.email, 200).toLowerCase(), str(b.phone, 30), hashPassword(b.password), str(b.company_name, 200));
-    db.prepare('INSERT INTO companies (user_id, company_name, cr_number, city, address, contact_person) VALUES (?,?,?,?,?,?)')
-      .run(info.lastInsertRowid, str(b.company_name, 200), str(b.cr_number, 50), str(b.city, 100), str(b.address), str(b.contact_person, 200));
+    const info = db.prepare('INSERT INTO users (role, email, phone, password_hash, name, lang, notify_channel) VALUES (?,?,?,?,?,?,?)')
+      .run('company', str(b.email, 200).toLowerCase(), str(b.phone, 30), hashPassword(b.password), str(b.company_name, 200), req.lang, notifyChannel(b.notify_channel));
+    db.prepare('INSERT INTO companies (user_id, company_name, cr_number, city, address, contact_person, logo_file) VALUES (?,?,?,?,?,?,?)')
+      .run(info.lastInsertRowid, str(b.company_name, 200), str(b.cr_number, 50), str(b.city, 100), str(b.address), str(b.contact_person, 200), logo);
     return info.lastInsertRowid;
   });
   const id = tx();
@@ -224,13 +305,17 @@ app.post('/register/worker', (req, res) => {
     || (!str(b.nationality) && 'Nationality is required.')
     || (!str(b.profession) && 'Profession is required.')
     || (!str(b.phone) && 'Phone number is required.');
-  if (err) return res.status(400).render('register-worker', { title: 'Worker Registration', form: b, error: err });
+  const custom = readCustomFields(req);
+  if (err || custom.error) {
+    return res.status(400).render('register-worker', { title: 'Worker Registration', form: b, error: err || custom.error, fields: activeFields(), values: customFormValues(b) });
+  }
   const tx = db.transaction(() => {
-    const info = db.prepare('INSERT INTO users (role, email, phone, password_hash, name) VALUES (?,?,?,?,?)')
-      .run('worker', str(b.email, 200).toLowerCase(), str(b.phone, 30), hashPassword(b.password), str(b.full_name, 200));
+    const info = db.prepare('INSERT INTO users (role, email, phone, password_hash, name, lang, notify_channel) VALUES (?,?,?,?,?,?,?)')
+      .run('worker', str(b.email, 200).toLowerCase(), str(b.phone, 30), hashPassword(b.password), str(b.full_name, 200), req.lang, notifyChannel(b.notify_channel));
     db.prepare(`INSERT INTO workers (user_id, full_name, nationality, iqama_number, passport_number, profession, experience_years, skills, city, date_of_birth)
       VALUES (?,?,?,?,?,?,?,?,?,?)`).run(info.lastInsertRowid, str(b.full_name, 200), str(b.nationality, 100), str(b.iqama_number, 30),
       str(b.passport_number, 30), str(b.profession, 100), Math.max(0, int(b.experience_years)), str(b.skills, 1000), str(b.city, 100), str(b.date_of_birth, 10));
+    saveCustomFields(info.lastInsertRowid, custom.values);
     return info.lastInsertRowid;
   });
   const id = tx();
@@ -373,7 +458,7 @@ app.get('/company/applications/:id', companyOnly, (req, res) => {
   const a = companyApplication(req, res); if (!a) return;
   const worker = db.prepare('SELECT w.*, u.email, u.phone FROM workers w JOIN users u ON u.id = w.user_id WHERE w.user_id = ?').get(a.worker_id);
   const documents = db.prepare('SELECT * FROM documents WHERE worker_id = ? ORDER BY doc_type, uploaded_at DESC').all(a.worker_id);
-  res.render('company/application', { title: worker.full_name, a, worker, documents });
+  res.render('company/application', { title: worker.full_name, a, worker, documents, extras: workerExtras(a.worker_id) });
 });
 
 app.post('/company/applications/:id/status', companyOnly, (req, res) => {
@@ -390,26 +475,41 @@ app.post('/company/applications/:id/status', companyOnly, (req, res) => {
       return res.redirect('/company/applications/' + a.id);
     }
   }
-  db.prepare("UPDATE applications SET status = ?, company_note = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(status, str(req.body.company_note, 1000), a.id);
+  const note = str(req.body.company_note, 1000);
+  db.prepare("UPDATE applications SET status = ?, company_note = ?, updated_at = datetime('now') WHERE id = ?").run(status, note, a.id);
+  if (status !== a.status) {
+    const message = {
+      shortlisted: 'ManpowerHub KSA: You have been shortlisted for "{job}" at {company}.',
+      hired: 'ManpowerHub KSA: Congratulations! {company} has hired you for "{job}".',
+      rejected: 'ManpowerHub KSA: Your application for "{job}" at {company} was not selected this time.',
+    }[status];
+    const company = db.prepare('SELECT company_name FROM companies WHERE user_id = ?').get(a.company_id).company_name;
+    if (message) notifyUser(a.worker_id, message, { job: a.demand_title, company, note: status === 'rejected' ? '' : note }, '/worker');
+  }
   flash(req, 'success', 'Applicant marked as {status}.', { status: req.t(APP_STATUS[status]) });
   res.redirect(req.body.back === 'list' ? '/company/demands/' + a.demand_id : '/company/applications/' + a.id);
 });
 
 app.get('/company/profile', companyOnly, (req, res) => {
-  const company = db.prepare('SELECT c.*, u.email, u.phone FROM companies c JOIN users u ON u.id=c.user_id WHERE c.user_id = ?').get(req.session.user.id);
+  const company = db.prepare('SELECT c.*, u.email, u.phone, u.notify_channel FROM companies c JOIN users u ON u.id=c.user_id WHERE c.user_id = ?').get(req.session.user.id);
   res.render('company/profile', { title: 'Company Profile', form: company });
 });
 
-app.post('/company/profile', companyOnly, (req, res) => {
+app.post('/company/profile', companyOnly, handleUpload(['logo'], '/company/profile', logoUpload), checkCsrf, (req, res) => {
   const b = req.body;
+  const newLogo = req.files?.logo?.[0]?.filename || null;
   if (!str(b.company_name) || !str(b.contact_person) || !str(b.city)) {
+    removeLogo(newLogo);
     flash(req, 'error', 'Company name, contact person and city are required.');
     return res.redirect('/company/profile');
   }
-  db.prepare('UPDATE companies SET company_name=?, city=?, address=?, contact_person=? WHERE user_id=?')
-    .run(str(b.company_name, 200), str(b.city, 100), str(b.address), str(b.contact_person, 200), req.session.user.id);
-  db.prepare('UPDATE users SET name=?, phone=? WHERE id=?').run(str(b.company_name, 200), str(b.phone, 30), req.session.user.id);
+  const oldLogo = db.prepare('SELECT logo_file FROM companies WHERE user_id = ?').get(req.session.user.id).logo_file;
+  let logo = oldLogo;
+  if (newLogo || b.remove_logo === '1') { removeLogo(oldLogo); logo = newLogo; }
+  db.prepare('UPDATE companies SET company_name=?, city=?, address=?, contact_person=?, logo_file=? WHERE user_id=?')
+    .run(str(b.company_name, 200), str(b.city, 100), str(b.address), str(b.contact_person, 200), logo, req.session.user.id);
+  db.prepare('UPDATE users SET name=?, phone=?, notify_channel=? WHERE id=?')
+    .run(str(b.company_name, 200), str(b.phone, 30), notifyChannel(b.notify_channel), req.session.user.id);
   req.session.user.name = str(b.company_name, 200);
   flash(req, 'success', 'Profile updated.');
   res.redirect('/company/profile');
@@ -426,7 +526,7 @@ app.get('/worker', workerOnly, (req, res) => {
     WHERE a.worker_id = ? ORDER BY a.updated_at DESC`).all(req.session.user.id);
   const docTypes = db.prepare('SELECT DISTINCT doc_type FROM documents WHERE worker_id = ?').all(req.session.user.id).map((r) => r.doc_type);
   const recommended = db.prepare(`
-    SELECT d.*, c.company_name FROM demands d JOIN companies c ON c.user_id = d.company_id
+    SELECT d.*, c.company_name, c.logo_file FROM demands d JOIN companies c ON c.user_id = d.company_id
     WHERE d.status='open' AND c.status='approved' AND (d.deadline IS NULL OR d.deadline = '' OR d.deadline >= date('now'))
       AND d.id NOT IN (SELECT demand_id FROM applications WHERE worker_id = ?)
     ORDER BY (d.category = ?) DESC, d.created_at DESC LIMIT 4`).all(req.session.user.id, worker.profession);
@@ -456,8 +556,8 @@ app.post('/worker/documents/:id/delete', workerOnly, (req, res) => {
 });
 
 app.get('/worker/profile', workerOnly, (req, res) => {
-  const worker = db.prepare('SELECT w.*, u.email, u.phone FROM workers w JOIN users u ON u.id = w.user_id WHERE w.user_id = ?').get(req.session.user.id);
-  res.render('worker/profile', { title: 'My Profile', form: worker });
+  const worker = db.prepare('SELECT w.*, u.email, u.phone, u.notify_channel FROM workers w JOIN users u ON u.id = w.user_id WHERE w.user_id = ?').get(req.session.user.id);
+  res.render('worker/profile', { title: 'My Profile', form: worker, fields: activeFields(), values: fieldValues(req.session.user.id) });
 });
 
 app.post('/worker/profile', workerOnly, (req, res) => {
@@ -466,10 +566,20 @@ app.post('/worker/profile', workerOnly, (req, res) => {
     flash(req, 'error', 'Name, nationality and profession are required.');
     return res.redirect('/worker/profile');
   }
+  const custom = readCustomFields(req);
+  if (custom.error) {
+    flash(req, 'error', custom.error);
+    return res.redirect('/worker/profile');
+  }
+  db.prepare(`UPDATE workers SET iqama_expiry=@iqama_expiry, passport_expiry=@passport_expiry, kafala_transfer=@kafala_transfer,
+    languages=@languages, driving_license=@driving_license, expected_salary=@expected_salary, available_from=@available_from,
+    work_history=@work_history WHERE user_id=@id`).run({ ...workerExtraColumns(b), id: req.session.user.id });
+  saveCustomFields(req.session.user.id, custom.values);
   db.prepare(`UPDATE workers SET full_name=?, nationality=?, iqama_number=?, passport_number=?, profession=?, experience_years=?, skills=?, city=?, date_of_birth=? WHERE user_id=?`)
     .run(str(b.full_name, 200), str(b.nationality, 100), str(b.iqama_number, 30), str(b.passport_number, 30), str(b.profession, 100),
       Math.max(0, int(b.experience_years)), str(b.skills, 1000), str(b.city, 100), str(b.date_of_birth, 10), req.session.user.id);
-  db.prepare('UPDATE users SET name=?, phone=? WHERE id=?').run(str(b.full_name, 200), str(b.phone, 30), req.session.user.id);
+  db.prepare('UPDATE users SET name=?, phone=?, notify_channel=? WHERE id=?')
+    .run(str(b.full_name, 200), str(b.phone, 30), notifyChannel(b.notify_channel), req.session.user.id);
   req.session.user.name = str(b.full_name, 200);
   flash(req, 'success', 'Profile updated.');
   res.redirect('/worker/profile');
@@ -501,6 +611,7 @@ app.post('/demands/:id/apply', workerOnly, handleUpload(docFields, (req) => '/de
   } else {
     db.prepare('INSERT INTO applications (demand_id, worker_id, cover_note) VALUES (?,?,?)').run(demand.id, workerId, str(req.body.cover_note, 1000));
   }
+  notifyUser(demand.company_id, 'ManpowerHub KSA: New application from {name} for "{job}".', { name: req.session.user.name, job: demand.title }, `/company/demands/${demand.id}`);
   flash(req, 'success', 'Application submitted! The company will review your documents. Track the status from your dashboard.');
   res.redirect('/worker');
 });
@@ -556,12 +667,18 @@ app.get('/admin', adminOnly, (req, res) => {
     (SELECT COUNT(*) FROM applications a WHERE a.demand_id = d.id AND a.status != 'withdrawn') AS applicant_count,
     (SELECT COUNT(*) FROM applications a WHERE a.demand_id = d.id AND a.status = 'hired') AS hired_count
     FROM demands d JOIN companies c ON c.user_id = d.company_id ORDER BY d.created_at DESC LIMIT 100`).all();
-  res.render('admin/dashboard', { title: 'Admin', stats, companies, workers, demands });
+  const notifications = db.prepare(`SELECT n.*, u.name FROM notifications n LEFT JOIN users u ON u.id = n.user_id
+    ORDER BY n.id DESC LIMIT 30`).all();
+  res.render('admin/dashboard', { title: 'Admin', stats, companies, workers, demands, notifications });
 });
 
 app.post('/admin/companies/:id/status', adminOnly, (req, res) => {
   const status = ['approved', 'rejected', 'pending'].includes(req.body.status) ? req.body.status : 'pending';
+  const before = db.prepare('SELECT company_name, status FROM companies WHERE user_id = ?').get(req.params.id);
   db.prepare('UPDATE companies SET status = ? WHERE user_id = ?').run(status, req.params.id);
+  if (before && status === 'approved' && before.status !== 'approved') {
+    notifyUser(Number(req.params.id), 'ManpowerHub KSA: Your company "{company}" has been approved. Your demands are now visible to workers.', { company: before.company_name }, '/company');
+  }
   flash(req, 'success', { approved: 'Company approved.', rejected: 'Company rejected.', pending: 'Company set to pending.' }[status]);
   res.redirect('/admin');
 });
@@ -570,7 +687,45 @@ app.get('/admin/workers/:id', adminOnly, (req, res) => {
   const worker = db.prepare('SELECT w.*, u.email, u.phone FROM workers w JOIN users u ON u.id = w.user_id WHERE w.user_id = ?').get(req.params.id);
   if (!worker) return res.status(404).render('error', { title: 'Not found', message: 'Worker not found.' });
   const documents = db.prepare('SELECT * FROM documents WHERE worker_id = ? ORDER BY doc_type').all(worker.user_id);
-  res.render('admin/worker', { title: worker.full_name, worker, documents });
+  res.render('admin/worker', { title: worker.full_name, worker, documents, extras: workerExtras(worker.user_id) });
+});
+
+// Admin chooses extra information to ask workers for.
+app.get('/admin/fields', adminOnly, (req, res) => {
+  const fields = db.prepare(`SELECT f.*, (SELECT COUNT(*) FROM worker_field_values v WHERE v.field_id = f.id) AS answers
+    FROM custom_fields f ORDER BY f.active DESC, f.sort, f.id`).all();
+  res.render('admin/fields', { title: 'Worker profile fields', fields });
+});
+
+app.post('/admin/fields', adminOnly, (req, res) => {
+  const label = str(req.body.label, 100);
+  const type = FIELD_TYPES[req.body.field_type] ? req.body.field_type : 'text';
+  const options = type === 'select' ? str(req.body.options, 1000).split(',').map((o) => o.trim()).filter(Boolean).join(', ') : '';
+  if (!label) {
+    flash(req, 'error', 'Field name is required.');
+    return res.redirect('/admin/fields');
+  }
+  if (type === 'select' && !options) {
+    flash(req, 'error', 'Please enter the choices, separated by commas.');
+    return res.redirect('/admin/fields');
+  }
+  const sort = db.prepare('SELECT COALESCE(MAX(sort), 0) + 1 n FROM custom_fields').get().n;
+  db.prepare('INSERT INTO custom_fields (label, field_type, options, required, sort) VALUES (?,?,?,?,?)')
+    .run(label, type, options, req.body.required === '1' ? 1 : 0, sort);
+  flash(req, 'success', 'Field added. Workers will see it in their profile.');
+  res.redirect('/admin/fields');
+});
+
+app.post('/admin/fields/:id/toggle', adminOnly, (req, res) => {
+  db.prepare('UPDATE custom_fields SET active = 1 - active WHERE id = ?').run(req.params.id);
+  flash(req, 'success', 'Field updated.');
+  res.redirect('/admin/fields');
+});
+
+app.post('/admin/fields/:id/delete', adminOnly, (req, res) => {
+  db.prepare('DELETE FROM custom_fields WHERE id = ?').run(req.params.id);
+  flash(req, 'success', 'Field deleted.');
+  res.redirect('/admin/fields');
 });
 
 // ---------- Errors ----------

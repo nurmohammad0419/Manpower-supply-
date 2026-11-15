@@ -38,4 +38,24 @@ const NATIONALITIES = [
   'Indonesia', 'Kenya', 'Uganda', 'Ethiopia',
 ];
 
-module.exports = { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES };
+// Can the worker's Iqama sponsorship (kafala) be transferred to a new employer?
+const KAFALA_OPTIONS = {
+  yes: 'Transferable',
+  no: 'Not transferable',
+  new_visa: 'Outside Saudi Arabia (new visa needed)',
+};
+
+const DRIVING_OPTIONS = {
+  none: 'No Saudi license',
+  light: 'Light vehicle',
+  heavy: 'Heavy vehicle',
+};
+
+const NOTIFY_CHANNELS = { whatsapp: 'WhatsApp', sms: 'SMS', none: 'No messages' };
+
+const FIELD_TYPES = { text: 'Text', number: 'Number', date: 'Date', yesno: 'Yes / No', select: 'Choice list' };
+
+module.exports = {
+  CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES,
+  KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
+};

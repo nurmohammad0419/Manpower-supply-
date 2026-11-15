@@ -6,7 +6,7 @@
     <span class="tag"><%= t(demand.category) %></span>
     <% if (demand.status !== 'open') { %><span class="badge badge-rejected"><%= t('Closed') %></span><% } %>
     <h1><bdi><%= demand.title %></bdi></h1>
-    <p class="muted"><bdi><%= demand.company_name %></bdi> · <%= t(demand.location_city) %><% if (demand.work_site) { %> — <bdi><%= demand.work_site %></bdi><% } %></p>
+    <p class="muted company-line"><%- include('partials/logo', { file: demand.logo_file }) %><bdi><%= demand.company_name %></bdi> · <%= t(demand.location_city) %><% if (demand.work_site) { %> — <bdi><%= demand.work_site %></bdi><% } %></p>
     <div class="rate big"><strong><%= demand.salary_amount %> <%= t('SAR') %></strong> <%= t(SALARY_TYPES[demand.salary_type]) %></div>
 
     <table class="kv">

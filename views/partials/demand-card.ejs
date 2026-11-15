@@ -4,7 +4,7 @@
     <span class="muted small"><%= t(d.location_city) %></span>
   </div>
   <h3><bdi><%= d.title %></bdi></h3>
-  <div class="muted small"><bdi><%= d.company_name %></bdi></div>
+  <div class="muted small company-line"><%- include('logo', { file: d.logo_file, size: 'sm' }) %><bdi><%= d.company_name %></bdi></div>
   <div class="rate"><strong><%= d.salary_amount %> <%= t('SAR') %></strong> <%= t(SALARY_TYPES[d.salary_type]) %></div>
   <div class="dc-meta">
     <span><%= t('{n} workers', { n: d.quantity }) %></span>

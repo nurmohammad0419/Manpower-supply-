@@ -1,0 +1,18 @@
+<% fields.forEach(f => { const v = values[f.id] ?? ''; const name = 'cf_' + f.id; %>
+  <label><bdi><%= f.label %></bdi><%= f.required ? ' *' : '' %>
+    <% if (f.field_type === 'yesno') { %>
+      <select name="<%= name %>" <%= f.required ? 'required' : '' %>>
+        <option value=""><%= t('Choose…') %></option>
+        <option value="yes" <%= v === 'yes' ? 'selected' : '' %>><%= t('Yes') %></option>
+        <option value="no" <%= v === 'no' ? 'selected' : '' %>><%= t('No') %></option>
+      </select>
+    <% } else if (f.field_type === 'select') { %>
+      <select name="<%= name %>" <%= f.required ? 'required' : '' %>>
+        <option value=""><%= t('Choose…') %></option>
+        <% f.options.split(',').map(o => o.trim()).filter(Boolean).forEach(o => { %><option value="<%= o %>" <%= v === o ? 'selected' : '' %>><%= o %></option><% }) %>
+      </select>
+    <% } else { %>
+      <input type="<%= f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text' %>" <%= f.field_type === 'number' ? 'step=any' : '' %> name="<%= name %>" value="<%= v %>" maxlength="1000" <%= f.required ? 'required' : '' %>>
+    <% } %>
+  </label>
+<% }) %>

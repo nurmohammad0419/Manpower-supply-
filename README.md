@@ -7,7 +7,7 @@ Companies in Saudi Arabia post manpower demands online, workers browse them and 
 ## Features
 
 **Company (কোম্পানি)**
-- Register once: company name, CR number, contact person, city
+- Register once: company name, CR number, contact person, city, and an optional company logo (shown on its demands and demand letters)
 - Post demands: category, number of workers, rate in SAR (hourly / daily / monthly), hours per day, days per week, overtime, duration, city and site, food / accommodation / transport, start date, last date to apply, required documents
 - Auto-generated printable **demand letter** for each demand (print or save as PDF)
 - Applicant list per demand with filters (New / Shortlisted / Hired / Rejected)
@@ -16,6 +16,7 @@ Companies in Saudi Arabia post manpower demands online, workers browse them and 
 
 **Worker (কর্মী)**
 - Register: name, nationality, Iqama number, passport number, profession, experience, skills
+- Optional extra details in the profile: Iqama and passport expiry, sponsorship (kafala) transfer, Saudi driving license, languages, expected salary, available-from date, work history — companies see these when the worker applies
 - Upload documents once (Iqama, Passport, Photo, CV, license, medical, certificates) and reuse them for every application
 - Browse and search demands by keyword, category and city
 - Apply; any missing required document can be uploaded on the apply form
@@ -24,6 +25,13 @@ Companies in Saudi Arabia post manpower demands online, workers browse them and 
 **Admin**
 - Verify (approve / reject) companies. Demands become public only after the company is approved.
 - Overview of companies, demands, workers and their documents
+- **Worker profile fields**: add any extra question for workers (text, number, date, yes/no or a choice list; optional or required). It appears in the worker registration form and profile, and companies see the answers. Fields can be hidden or deleted later.
+- Log of every WhatsApp / SMS message and whether it was sent
+
+**WhatsApp / SMS notifications**
+- Worker: when shortlisted, hired (with the company's note) or not selected
+- Company: when a worker applies, and when the admin approves the company
+- Messages are written in each person's chosen language. Everyone can choose WhatsApp, SMS or no messages in their profile.
 
 **Languages (ভাষা)**
 - English is the main language. A menu in the top bar switches to বাংলা (Bangla), हिन्दी (Hindi), اردو (Urdu), नेपाली (Nepali), සිංහල (Sinhala, Sri Lanka), العربية (Arabic) or Filipino. The choice is remembered.
@@ -49,6 +57,23 @@ npm test             # end-to-end test of the whole flow
 On first start an admin account is created: `admin@manpower.local` / `admin123`.
 **Set `ADMIN_PASSWORD` (and optionally `ADMIN_EMAIL`) before the first production start.**
 
+### Setting up WhatsApp / SMS
+
+Without these settings the site works normally, and messages are only listed in the admin panel as "Not sent".
+Saudi numbers typed as `05xxxxxxxx` are converted to `+9665xxxxxxxx` automatically.
+
+**WhatsApp through Meta (WhatsApp Cloud API)** — set `WHATSAPP_PROVIDER=meta`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
+WhatsApp only lets a business start a conversation with an approved *message template*. Create a template
+in WhatsApp Manager whose body is one variable, for example `{{1}}`, and set `WHATSAPP_TEMPLATE` to its name.
+Set `WHATSAPP_TEMPLATE_LANG` to the template's language code (default `en`); if you create the template in more
+languages, set e.g. `WHATSAPP_TEMPLATE_LANG_BN=bn`, `WHATSAPP_TEMPLATE_LANG_AR=ar`.
+
+**WhatsApp or SMS through Twilio** — set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, then
+`WHATSAPP_PROVIDER=twilio` with `TWILIO_WHATSAPP_FROM`, and/or `SMS_PROVIDER=twilio` with `TWILIO_SMS_FROM`
+(or `TWILIO_MESSAGING_SERVICE_SID`). SMS to Saudi numbers needs a registered sender name.
+
+Set `BASE_URL` (e.g. `https://yoursite.com`) to add a link to the site at the end of each message.
+
 ### Configuration (environment variables)
 
 | Variable | Default | Purpose |
@@ -59,6 +84,8 @@ On first start an admin account is created: `admin@manpower.local` / `admin123`.
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin@manpower.local` / `admin123` | First admin account |
 | `COOKIE_SECURE` | unset | Set to `1` when served over HTTPS |
 | `NODE_ENV` | unset | Set to `production` to cache templates |
+| `BASE_URL` | unset | Site address, used for links in WhatsApp / SMS messages |
+| `WHATSAPP_PROVIDER`, `SMS_PROVIDER` | unset | `meta` / `twilio` — see above |
 
 Back up `DATA_DIR` and `UPLOAD_DIR`; they hold all the data.
 
@@ -69,6 +96,7 @@ src/server.js        routes: public pages, auth, company, worker, admin, documen
 src/db.js            SQLite schema and the first admin account
 src/constants.js     job categories, document types, cities
 src/i18n.js          language list and translation lookup
+src/notify.js        WhatsApp / SMS messages (Meta, Twilio)
 src/locales/*.json   translations (English text → translated text)
 src/lib/web.js       small built-in web framework (routing, sessions, uploads)
 src/lib/template.js  EJS-style templates
@@ -91,7 +119,6 @@ and create `src/locales/<code>.json`.
 
 - Have native speakers review the translations
 - Tamil for Sri Lankan Tamil-speaking workers
-- SMS / WhatsApp / email notifications when the status changes
 - Mobile app for workers
 - Payments: company subscription or per-hire fee
 - Attendance and timesheets for hired workers, invoicing to companies

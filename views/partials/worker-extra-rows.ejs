@@ -1,0 +1,8 @@
+<% if (worker.iqama_expiry) { %><tr><th><%= t('Iqama expiry date') %></th><td><%= fmtDate(worker.iqama_expiry) %></td></tr><% } %>
+<% if (worker.passport_expiry) { %><tr><th><%= t('Passport expiry date') %></th><td><%= fmtDate(worker.passport_expiry) %></td></tr><% } %>
+<% if (worker.kafala_transfer) { %><tr><th><%= t('Sponsorship (kafala) transfer') %></th><td><%= t(KAFALA_OPTIONS[worker.kafala_transfer]) %></td></tr><% } %>
+<% if (worker.driving_license) { %><tr><th><%= t('Saudi driving license') %></th><td><%= t(DRIVING_OPTIONS[worker.driving_license]) %></td></tr><% } %>
+<% if (worker.languages) { %><tr><th><%= t('Languages spoken') %></th><td><bdi><%= worker.languages %></bdi></td></tr><% } %>
+<% if (worker.expected_salary) { %><tr><th><%= t('Expected salary (SAR)') %></th><td><bdi><%= worker.expected_salary %></bdi></td></tr><% } %>
+<% if (worker.available_from) { %><tr><th><%= t('Available from') %></th><td><%= fmtDate(worker.available_from) %></td></tr><% } %>
+<% extras.forEach(x => { %><tr><th><bdi><%= x.label %></bdi></th><td><% if (x.field_type === 'yesno') { %><%= t(x.value === 'yes' ? 'Yes' : 'No') %><% } else if (x.field_type === 'date') { %><%= fmtDate(x.value) %><% } else { %><bdi><%= x.value %></bdi><% } %></td></tr><% }) %>

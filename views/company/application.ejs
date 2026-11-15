@@ -15,7 +15,9 @@
       <tr><th><%= t('Skills') %></th><td><bdi><%= worker.skills || '—' %></bdi></td></tr>
       <tr><th><%= t('Phone') %></th><td dir="ltr"><a href="tel:<%= worker.phone %>"><%= worker.phone %></a></td></tr>
       <tr><th><%= t('Email') %></th><td dir="ltr"><a href="mailto:<%= worker.email %>"><%= worker.email %></a></td></tr>
+      <%- include('../partials/worker-extra-rows') %>
     </table>
+    <% if (worker.work_history) { %><h3><%= t('Work history') %></h3><p class="prewrap" dir="auto"><%= worker.work_history %></p><% } %>
     <% if (a.cover_note) { %><h3><%= t('Message from worker') %></h3><p class="prewrap" dir="auto"><bdi><%= a.cover_note %></bdi></p><% } %>
 
     <h3><%= t('Documents') %></h3>

@@ -8,7 +8,9 @@
     <tr><th><%= t('Iqama No.') %></th><td><%= worker.iqama_number || '—' %></td></tr>
     <tr><th><%= t('Passport No.') %></th><td><%= worker.passport_number || '—' %></td></tr>
     <tr><th><%= t('Phone') %> / <%= t('Email') %></th><td dir="ltr"><%= worker.phone %> · <%= worker.email %></td></tr>
+    <%- include('../partials/worker-extra-rows') %>
   </table>
+  <% if (worker.work_history) { %><h3><%= t('Work history') %></h3><p class="prewrap" dir="auto"><%= worker.work_history %></p><% } %>
   <h3><%= t('Documents') %></h3>
   <div class="docs">
     <% documents.forEach(d => { %>

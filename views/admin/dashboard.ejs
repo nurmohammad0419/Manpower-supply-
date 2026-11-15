@@ -1,6 +1,9 @@
 <%- include('../partials/header') %>
 <% const cStatus = { approved: 'Approved', rejected: 'Rejected', pending: 'Pending' }; %>
-<h1><%= t('Admin panel') %></h1>
+<div class="section-head">
+  <h1><%= t('Admin panel') %></h1>
+  <a class="btn btn-alt" href="/admin/fields"><%= t('Worker profile fields') %></a>
+</div>
 <div class="stats stats-row">
   <div class="stat"><b><%= stats.companies %></b><span><%= t('Companies') %></span></div>
   <div class="stat"><b><%= stats.pending %></b><span><%= t('Pending approval') %></span></div>
@@ -69,6 +72,25 @@
         <td class="small"><span dir="ltr"><%= w.phone %></span><br><%= w.email %></td>
         <td><%= w.doc_count %></td>
         <td><%= w.app_count %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<h2><%= t('WhatsApp / SMS messages') %></h2>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Date') %></th><th><%= t('To') %></th><th><%= t('Message') %></th><th><%= t('Status') %></th></tr></thead>
+    <tbody>
+    <% if (!notifications.length) { %><tr><td colspan="4" class="muted"><%= t('No messages yet.') %></td></tr><% } %>
+    <% const nStatus = { sent: 'Sent', failed: 'Failed', not_sent: 'Not sent', pending: 'Sending' }; %>
+    <% notifications.forEach(n => { %>
+      <tr>
+        <td class="small nowrap"><%= fmtDate(n.created_at) %></td>
+        <td class="small"><bdi><%= n.name || '—' %></bdi><br><span dir="ltr"><%= n.recipient %></span> · <%= n.channel === 'sms' ? 'SMS' : 'WhatsApp' %></td>
+        <td class="small prewrap" dir="auto"><%= n.body %></td>
+        <td><span class="badge badge-<%= n.status === 'sent' ? 'hired' : n.status === 'failed' ? 'rejected' : 'withdrawn' %>"><%= t(nStatus[n.status]) %></span>
+          <% if (n.error) { %><div class="small muted"><%= n.error %></div><% } %></td>
       </tr>
     <% }) %>
     </tbody>

@@ -4,7 +4,7 @@
 <body class="letter-body">
 <div class="letter">
   <div class="letter-head">
-    <div><h1><bdi><%= demand.company_name %></bdi></h1><div><%= t('CR No.') %>: <%= demand.cr_number %> · <%= t(demand.company_city) %></div></div>
+    <div class="letter-company"><%- include('partials/logo', { file: demand.logo_file, size: 'lg' }) %><div><h1><bdi><%= demand.company_name %></bdi></h1><div><%= t('CR No.') %>: <%= demand.cr_number %> · <%= t(demand.company_city) %></div></div></div>
     <div class="right"><b><%= t('DEMAND LETTER') %></b><br><%= t('Ref') %>: MH-<%= String(demand.id).padStart(5, '0') %><br><%= t('Date') %>: <%= fmtDate(demand.created_at) %></div>
   </div>
   <p><%= t('We require the following manpower. Interested candidates may apply online at ManpowerHub KSA with the documents listed below.') %></p>

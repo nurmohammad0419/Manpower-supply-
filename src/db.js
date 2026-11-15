@@ -108,7 +108,54 @@ CREATE INDEX IF NOT EXISTS idx_demands_status ON demands(status);
 CREATE INDEX IF NOT EXISTS idx_applications_demand ON applications(demand_id);
 CREATE INDEX IF NOT EXISTS idx_applications_worker ON applications(worker_id);
 CREATE INDEX IF NOT EXISTS idx_documents_worker ON documents(worker_id);
+
+-- Extra worker profile fields defined by the admin (e.g. "Height", "Shoe size", "Last employer").
+CREATE TABLE IF NOT EXISTS custom_fields (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  field_type TEXT NOT NULL CHECK (field_type IN ('text','number','date','yesno','select')),
+  options TEXT NOT NULL DEFAULT '',
+  required INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  sort INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS worker_field_values (
+  worker_id INTEGER NOT NULL REFERENCES workers(user_id) ON DELETE CASCADE,
+  field_id INTEGER NOT NULL REFERENCES custom_fields(id) ON DELETE CASCADE,
+  value TEXT NOT NULL,
+  PRIMARY KEY (worker_id, field_id)
+);
+
+-- Every WhatsApp / SMS message the system tried to send.
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  channel TEXT NOT NULL,
+  recipient TEXT NOT NULL,
+  body TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','sent','failed','not_sent')),
+  error TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
+
+// Add columns introduced after the first release (safe to run on every start).
+function addColumn(table, column, definition) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+addColumn('users', 'lang', "TEXT NOT NULL DEFAULT 'en'");
+addColumn('users', 'notify_channel', "TEXT NOT NULL DEFAULT 'whatsapp'");
+addColumn('companies', 'logo_file', 'TEXT');
+addColumn('workers', 'iqama_expiry', 'TEXT');
+addColumn('workers', 'passport_expiry', 'TEXT');
+addColumn('workers', 'kafala_transfer', "TEXT NOT NULL DEFAULT ''");
+addColumn('workers', 'languages', 'TEXT');
+addColumn('workers', 'driving_license', "TEXT NOT NULL DEFAULT ''");
+addColumn('workers', 'expected_salary', 'TEXT');
+addColumn('workers', 'available_from', 'TEXT');
+addColumn('workers', 'work_history', 'TEXT');
 
 // Seed an admin account on first run.
 const adminEmail = (process.env.ADMIN_EMAIL || 'admin@manpower.local').toLowerCase();

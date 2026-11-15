@@ -2,7 +2,9 @@
 // `node scripts/i18n-keys.js` prints the keys missing from each language file.
 const fs = require('fs');
 const path = require('path');
-const { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES } = require('../src/constants');
+const {
+  CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES, KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
+} = require('../src/constants');
 
 const root = path.join(__dirname, '..');
 
@@ -19,6 +21,8 @@ function collectKeys() {
     for (const m of src.matchAll(/\bt\('((?:[^'\\]|\\.)+)'/g)) add(m[1]);
     for (const m of src.matchAll(/\b(?:approved|rejected|pending): '([^']+)'/g)) add(m[1]);
     for (const m of src.matchAll(/\['\w+', '([^']+)'\]/g)) add(m[1]);
+    for (const m of src.matchAll(/\bt\([^()]*?\? '([^']+)' : '([^']+)'\)/g)) { add(m[1]); add(m[2]); }
+    for (const m of src.matchAll(/\b(?:sent|failed|not_sent|pending): '([^']+)'/g)) add(m[1]);
   }
 
   const server = fs.readFileSync(path.join(root, 'src/server.js'), 'utf8');
@@ -29,15 +33,22 @@ function collectKeys() {
     /&& '([^']+)'\)/g,
     /return '([^']+)';/g,
     /\b(?:yes|no|allowance|approved|rejected|pending): '([^']+)'/g,
+    /\b(?:shortlisted|hired): '([^']+)'/g,
+    /notifyUser\([^,]+, '([^']+)'/g,
+    /req\.t\('([^']+)'/g,
   ];
   for (const re of patterns) for (const m of server.matchAll(re)) add(m[1]);
   // Titles of pages rendered with a variable title are user content and not translated.
+
+  const notify = fs.readFileSync(path.join(root, 'src/notify.js'), 'utf8');
+  for (const m of notify.matchAll(/\bt\('([^']+)'/g)) add(m[1]);
 
   const web = fs.readFileSync(path.join(root, 'src/lib/web.js'), 'utf8');
   for (const m of web.matchAll(/new Error\('([^']+)'\)/g)) add(m[1]);
   for (const m of web.matchAll(/e\.message = '([^']+)'/g)) add(m[1]);
 
-  [CATEGORIES, Object.values(DOC_TYPES), CITIES, Object.values(SALARY_TYPES), Object.values(APP_STATUS), NATIONALITIES]
+  [CATEGORIES, Object.values(DOC_TYPES), CITIES, Object.values(SALARY_TYPES), Object.values(APP_STATUS), NATIONALITIES,
+    Object.values(KAFALA_OPTIONS), Object.values(DRIVING_OPTIONS), Object.values(NOTIFY_CHANNELS), Object.values(FIELD_TYPES)]
     .forEach((list) => list.forEach(add));
   ['Open', 'Closed'].forEach(add);
   return [...keys].filter((k) => !/^\/|^[a-z_]+$/.test(k)).sort();

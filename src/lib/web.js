@@ -212,11 +212,12 @@ function sessions({ db, maxAgeMs, secure }) {
       const s = req.session;
       const json = JSON.stringify({ ...s, _destroyed: undefined });
       const cookieBase = `; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
-      if (s._destroyed) { res.setHeader('Set-Cookie', 'sid=' + cookieBase + '; Max-Age=0'); return; }
+      const setCookie = (v) => res.setHeader('Set-Cookie', [].concat(res.getHeader('Set-Cookie') || [], v));
+      if (s._destroyed) { setCookie('sid=' + cookieBase + '; Max-Age=0'); return; }
       if (json === '{}' && !sid) return; // nothing to store
       if (!sid) sid = crypto.randomBytes(32).toString('hex');
       put.run(sid, json, Date.now() + maxAgeMs); // sliding expiry
-      res.setHeader('Set-Cookie', `sid=${sid}${cookieBase}; Max-Age=${Math.floor(maxAgeMs / 1000)}`);
+      setCookie(`sid=${sid}${cookieBase}; Max-Age=${Math.floor(maxAgeMs / 1000)}`);
     });
     next();
   };
@@ -258,8 +259,8 @@ function sniffMime(b) {
 
 const EXT = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
 
-// upload({ dir, maxFileSize, allowedFields }) → middleware filling req.body and req.files
-function upload({ dir, maxFileSize, maxFiles, allowedFields }) {
+// upload({ dir, maxFileSize, allowedFields, allowedMimes }) → middleware filling req.body and req.files
+function upload({ dir, maxFileSize, maxFiles, allowedFields, allowedMimes = Object.keys(EXT) }) {
   return async (req, res, next) => {
     if (req.method !== 'POST' || !req.is('multipart/form-data')) return next();
     const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(req.headers['content-type'] || '');
@@ -272,9 +273,10 @@ function upload({ dir, maxFileSize, maxFiles, allowedFields }) {
         if (p.filename === undefined) { addField(body, p.name, p.content.toString('utf8')); continue; }
         if (!p.filename || !p.content.length) continue; // empty file input
         if (!allowedFields.includes(p.name)) continue;
-        if (p.content.length > maxFileSize) throw Object.assign(new Error('Each file must be 5 MB or smaller.'), { userError: true });
+        if (p.content.length > maxFileSize) throw Object.assign(new Error('File is too large. Maximum size is {mb} MB.'), { userError: true, params: { mb: Math.round(maxFileSize / 1048576) } });
         const mime = sniffMime(p.content);
         if (!mime) throw Object.assign(new Error('"{file}" is not a PDF, JPG, PNG or WEBP file.'), { userError: true, params: { file: path.basename(p.filename) } });
+        if (!allowedMimes.includes(mime)) throw Object.assign(new Error('"{file}" must be a JPG, PNG or WEBP image.'), { userError: true, params: { file: path.basename(p.filename) } });
         (files[p.name] ||= []).push({ originalname: path.basename(p.filename).slice(0, 200), mimetype: mime, content: p.content });
       }
       // Only write files once the whole request is valid.
@@ -290,7 +292,7 @@ function upload({ dir, maxFileSize, maxFiles, allowedFields }) {
       req.files = files;
       next();
     } catch (e) {
-      if (e.code === 'LIMIT_FILE_SIZE') e.message = 'Each file must be 5 MB or smaller.';
+      if (e.code === 'LIMIT_FILE_SIZE') { e.message = 'File is too large. Maximum size is {mb} MB.'; e.params = { mb: Math.round(maxFileSize / 1048576) }; }
       e.userError = true;
       next(e);
     }

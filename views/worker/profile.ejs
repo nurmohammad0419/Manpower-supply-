@@ -8,6 +8,35 @@
       <label><%= t('Email') %> <input value="<%= form.email %>" disabled dir="ltr"></label>
       <label><%= t('Phone (WhatsApp)') %> <input name="phone" value="<%= form.phone || '' %>" dir="ltr"></label>
     </div>
+    <%- include('../partials/notify-field') %>
+    <fieldset><legend><%= t('More details (optional)') %></legend>
+      <p class="hint"><%= t('Companies see these details when you apply. More details help you get hired faster.') %></p>
+      <div class="row2">
+        <label><%= t('Iqama expiry date') %> <input type="date" name="iqama_expiry" value="<%= form.iqama_expiry || '' %>"></label>
+        <label><%= t('Passport expiry date') %> <input type="date" name="passport_expiry" value="<%= form.passport_expiry || '' %>"></label>
+      </div>
+      <div class="row2">
+        <label><%= t('Sponsorship (kafala) transfer') %>
+          <select name="kafala_transfer"><option value=""><%= t('Choose…') %></option>
+            <% Object.entries(KAFALA_OPTIONS).forEach(([k, v]) => { %><option value="<%= k %>" <%= form.kafala_transfer === k ? 'selected' : '' %>><%= t(v) %></option><% }) %>
+          </select>
+        </label>
+        <label><%= t('Saudi driving license') %>
+          <select name="driving_license"><option value=""><%= t('Choose…') %></option>
+            <% Object.entries(DRIVING_OPTIONS).forEach(([k, v]) => { %><option value="<%= k %>" <%= form.driving_license === k ? 'selected' : '' %>><%= t(v) %></option><% }) %>
+          </select>
+        </label>
+      </div>
+      <div class="row3">
+        <label><%= t('Languages spoken') %> <input name="languages" maxlength="300" value="<%= form.languages || '' %>" placeholder="<%= t('e.g. Bangla, Arabic, Hindi') %>"></label>
+        <label><%= t('Expected salary (SAR)') %> <input name="expected_salary" maxlength="100" value="<%= form.expected_salary || '' %>" placeholder="<%= t('e.g. 1800 per month') %>"></label>
+        <label><%= t('Available from') %> <input type="date" name="available_from" value="<%= form.available_from || '' %>"></label>
+      </div>
+      <label><%= t('Work history') %>
+        <textarea name="work_history" rows="4" maxlength="3000" placeholder="<%= t('e.g. 2019–2023 Electrician, Al Noor Contracting, Riyadh') %>"><%= form.work_history || '' %></textarea>
+      </label>
+      <%- include('../partials/custom-fields') %>
+    </fieldset>
     <button class="btn"><%= t('Save') %></button>
   </form>
 </div>

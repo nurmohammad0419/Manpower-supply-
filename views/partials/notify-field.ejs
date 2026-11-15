@@ -1,0 +1,6 @@
+<label><%= t('Get updates by') %>
+  <select name="notify_channel">
+    <% Object.entries(NOTIFY_CHANNELS).forEach(([k, v]) => { %><option value="<%= k %>" <%= (form.notify_channel || 'whatsapp') === k ? 'selected' : '' %>><%= t(v) %></option><% }) %>
+  </select>
+  <span class="hint"><%= t('We send a message to your phone number when something changes.') %></span>
+</label>
