@@ -1,20 +1,20 @@
 <%- include('partials/header') %>
-<h1>Job Demands</h1>
+<h1><%= t('Job Demands') %></h1>
 <form class="filters card" method="get" action="/demands">
-  <input type="search" name="q" value="<%= filters.q %>" placeholder="Search job, company, keyword…">
+  <input type="search" name="q" value="<%= filters.q %>" placeholder="<%= t('Search job, company, keyword…') %>">
   <select name="category">
-    <option value="">All categories</option>
-    <% CATEGORIES.forEach(c => { %><option <%= filters.category === c ? 'selected' : '' %>><%= c %></option><% }) %>
+    <option value=""><%= t('All categories') %></option>
+    <% CATEGORIES.forEach(c => { %><option value="<%= c %>" <%= filters.category === c ? 'selected' : '' %>><%= t(c) %></option><% }) %>
   </select>
   <select name="city">
-    <option value="">All cities</option>
-    <% CITIES.forEach(c => { %><option <%= filters.city === c ? 'selected' : '' %>><%= c %></option><% }) %>
+    <option value=""><%= t('All cities') %></option>
+    <% CITIES.forEach(c => { %><option value="<%= c %>" <%= filters.city === c ? 'selected' : '' %>><%= t(c) %></option><% }) %>
   </select>
-  <button class="btn">Search</button>
+  <button class="btn"><%= t('Search') %></button>
 </form>
-<p class="muted"><%= demands.length %> open demand(s)</p>
+<p class="muted"><%= t('{n} open demand(s)', { n: demands.length }) %></p>
 <% if (!demands.length) { %>
-  <div class="card empty">No demands match your search.</div>
+  <div class="card empty"><%= t('No demands match your search.') %></div>
 <% } else { %>
   <div class="grid"><% demands.forEach(d => { %><%- include('partials/demand-card', { d }) %><% }) %></div>
 <% } %>

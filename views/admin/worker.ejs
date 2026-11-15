@@ -1,23 +1,23 @@
 <%- include('../partials/header') %>
-<div class="crumbs"><a href="/admin">← Admin</a></div>
+<div class="crumbs"><a href="/admin"><span class="arr">←</span> <%= t('Admin') %></a></div>
 <div class="card">
-  <h1><%= worker.full_name %></h1>
+  <h1><bdi><%= worker.full_name %></bdi></h1>
   <table class="kv">
-    <tr><th>Nationality</th><td><%= worker.nationality %></td></tr>
-    <tr><th>Profession</th><td><%= worker.profession %> (<%= worker.experience_years %> years)</td></tr>
-    <tr><th>Iqama No.</th><td><%= worker.iqama_number || '—' %></td></tr>
-    <tr><th>Passport No.</th><td><%= worker.passport_number || '—' %></td></tr>
-    <tr><th>Phone / Email</th><td><%= worker.phone %> · <%= worker.email %></td></tr>
+    <tr><th><%= t('Nationality') %></th><td><%= t(worker.nationality) %></td></tr>
+    <tr><th><%= t('Profession') %></th><td><%= t(worker.profession) %> (<%= t('{n} years', { n: worker.experience_years }) %>)</td></tr>
+    <tr><th><%= t('Iqama No.') %></th><td><%= worker.iqama_number || '—' %></td></tr>
+    <tr><th><%= t('Passport No.') %></th><td><%= worker.passport_number || '—' %></td></tr>
+    <tr><th><%= t('Phone') %> / <%= t('Email') %></th><td dir="ltr"><%= worker.phone %> · <%= worker.email %></td></tr>
   </table>
-  <h3>Documents</h3>
+  <h3><%= t('Documents') %></h3>
   <div class="docs">
     <% documents.forEach(d => { %>
       <a class="doc" href="/documents/<%= d.id %>" target="_blank">
         <% if (d.mime_type.startsWith('image/')) { %><img src="/documents/<%= d.id %>" alt=""><% } else { %><div class="pdf">PDF</div><% } %>
-        <b><%= DOC_TYPES[d.doc_type] %></b><span class="small muted"><%= d.original_name %></span>
+        <b><%= t(DOC_TYPES[d.doc_type]) %></b><span class="small muted"><bdi><%= d.original_name %></bdi></span>
       </a>
     <% }) %>
-    <% if (!documents.length) { %><p class="muted">No documents.</p><% } %>
+    <% if (!documents.length) { %><p class="muted"><%= t('No documents uploaded.') %></p><% } %>
   </div>
 </div>
 <%- include('../partials/footer') %>

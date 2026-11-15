@@ -4,7 +4,8 @@ const crypto = require('crypto');
 const db = require('./db');
 const web = require('./lib/web');
 const { hashPassword, verifyPassword } = require('./lib/password');
-const { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS } = require('./constants');
+const { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES } = require('./constants');
+const { LANGUAGES, translator, pickLanguage } = require('./i18n');
 
 const app = web.createApp();
 const PORT = Number(process.env.PORT) || 3000;
@@ -13,6 +14,19 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 app.set('views', path.join(__dirname, '..', 'views'));
 app.use(web.serveStatic(path.join(__dirname, '..', 'public')));
+
+// Language: chosen from the header menu, remembered in a cookie. English is the default.
+app.use((req, res, next) => {
+  req.lang = pickLanguage(req);
+  req.t = translator(req.lang);
+  next();
+});
+app.get('/lang', (req, res) => {
+  const code = LANGUAGES[req.query.code] ? req.query.code : 'en';
+  const nextUrl = String(req.query.next || '/');
+  res.set('Set-Cookie', `lang=${code}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`);
+  res.redirect(nextUrl.startsWith('/') && !nextUrl.startsWith('//') ? nextUrl : '/');
+});
 app.use(web.urlencoded());
 app.use(web.sessions({ db, maxAgeMs: 1000 * 60 * 60 * 24 * 7, secure: process.env.COOKIE_SECURE === '1' }));
 
@@ -23,14 +37,15 @@ function handleUpload(fieldNames, back) {
   return (req, res, next) => mw(req, res, (err) => {
     if (!err) return next();
     if (!err.userError) return next(err);
-    flash(req, 'error', err.message);
+    flash(req, 'error', err.message, err.params);
     res.redirect(typeof back === 'function' ? back(req) : back);
   });
 }
 
 // ---------- Helpers ----------
-function flash(req, type, message) {
-  req.session.flash = { type, message };
+// Flash messages are translated when created; the next page is shown in the same language.
+function flash(req, type, message, params) {
+  req.session.flash = { type, message: req.t(message, params) };
 }
 
 function csrfToken(req) {
@@ -44,9 +59,13 @@ app.use((req, res, next) => {
   delete req.session.flash;
   res.locals.csrf = csrfToken(req);
   res.locals.path = req.path;
-  Object.assign(res.locals, { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS });
-  res.locals.fmtDate = (s) => (s ? new Date(s.replace(' ', 'T') + (s.length > 10 ? 'Z' : '')).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
-  res.locals.yesNo = (v) => ({ yes: 'Provided by company', no: 'Not provided', allowance: 'Allowance paid' }[v] || v);
+  res.locals.currentUrl = req.originalUrl;
+  Object.assign(res.locals, { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES, LANGUAGES });
+  const t = req.t;
+  const lang = LANGUAGES[req.lang];
+  Object.assign(res.locals, { t, lang: req.lang, dir: lang.dir });
+  res.locals.fmtDate = (s) => (s ? new Date(s.replace(' ', 'T') + (s.length > 10 ? 'Z' : '')).toLocaleDateString(lang.locale + '-u-nu-latn', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+  res.locals.yesNo = (v) => t({ yes: 'Provided by company', no: 'Not provided', allowance: 'Allowance paid' }[v] || v);
   next();
 });
 
@@ -354,7 +373,7 @@ app.get('/company/applications/:id', companyOnly, (req, res) => {
   const a = companyApplication(req, res); if (!a) return;
   const worker = db.prepare('SELECT w.*, u.email, u.phone FROM workers w JOIN users u ON u.id = w.user_id WHERE w.user_id = ?').get(a.worker_id);
   const documents = db.prepare('SELECT * FROM documents WHERE worker_id = ? ORDER BY doc_type, uploaded_at DESC').all(a.worker_id);
-  res.render('company/application', { title: 'Applicant: ' + worker.full_name, a, worker, documents });
+  res.render('company/application', { title: worker.full_name, a, worker, documents });
 });
 
 app.post('/company/applications/:id/status', companyOnly, (req, res) => {
@@ -367,13 +386,13 @@ app.post('/company/applications/:id/status', companyOnly, (req, res) => {
   if (status === 'hired' && a.status !== 'hired') {
     const hired = db.prepare("SELECT COUNT(*) n FROM applications WHERE demand_id = ? AND status = 'hired'").get(a.demand_id).n;
     if (hired >= a.quantity) {
-      flash(req, 'error', `You already hired ${hired} of ${a.quantity} workers. Increase the quantity in the demand to hire more.`);
+      flash(req, 'error', 'You already hired {hired} of {quantity} workers. Increase the quantity in the demand to hire more.', { hired, quantity: a.quantity });
       return res.redirect('/company/applications/' + a.id);
     }
   }
   db.prepare("UPDATE applications SET status = ?, company_note = ?, updated_at = datetime('now') WHERE id = ?")
     .run(status, str(req.body.company_note, 1000), a.id);
-  flash(req, 'success', `Applicant marked as ${APP_STATUS[status]}.`);
+  flash(req, 'success', 'Applicant marked as {status}.', { status: req.t(APP_STATUS[status]) });
   res.redirect(req.body.back === 'list' ? '/company/demands/' + a.demand_id : '/company/applications/' + a.id);
 });
 
@@ -421,7 +440,8 @@ app.get('/worker/documents', workerOnly, (req, res) => {
 
 app.post('/worker/documents', workerOnly, handleUpload(docFields, '/worker/documents'), checkCsrf, (req, res) => {
   const n = saveDocuments(req.session.user.id, req.files);
-  flash(req, n ? 'success' : 'error', n ? `${n} document(s) uploaded.` : 'Please choose at least one file.');
+  if (n) flash(req, 'success', '{n} document(s) uploaded.', { n });
+  else flash(req, 'error', 'Please choose at least one file.');
   res.redirect('/worker/documents');
 });
 
@@ -472,7 +492,7 @@ app.post('/demands/:id/apply', workerOnly, handleUpload(docFields, (req) => '/de
   const have = new Set(db.prepare('SELECT DISTINCT doc_type FROM documents WHERE worker_id = ?').all(workerId).map((r) => r.doc_type));
   const missing = demand.required_docs.split(',').filter((d) => d && !have.has(d));
   if (missing.length) {
-    flash(req, 'error', 'Please upload the required documents: ' + missing.map((m) => DOC_TYPES[m]).join(', '));
+    flash(req, 'error', 'Please upload the required documents: {docs}', { docs: missing.map((m) => req.t(DOC_TYPES[m])).join(', ') });
     return res.redirect(back);
   }
   if (existing) {
@@ -542,7 +562,7 @@ app.get('/admin', adminOnly, (req, res) => {
 app.post('/admin/companies/:id/status', adminOnly, (req, res) => {
   const status = ['approved', 'rejected', 'pending'].includes(req.body.status) ? req.body.status : 'pending';
   db.prepare('UPDATE companies SET status = ? WHERE user_id = ?').run(status, req.params.id);
-  flash(req, 'success', `Company ${status}.`);
+  flash(req, 'success', { approved: 'Company approved.', rejected: 'Company rejected.', pending: 'Company set to pending.' }[status]);
   res.redirect('/admin');
 });
 

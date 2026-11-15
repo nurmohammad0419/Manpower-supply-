@@ -25,16 +25,20 @@ before(async () => {
 after(() => { server.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
 
 class Client {
-  constructor() { this.cookie = ''; }
+  constructor() { this.jar = {}; }
   async req(method, url, body) {
     const headers = {};
-    if (this.cookie) headers.cookie = this.cookie;
+    const cookie = Object.entries(this.jar).map(([k, v]) => `${k}=${v}`).join('; ');
+    if (cookie) headers.cookie = cookie;
     let payload;
     if (body instanceof FormData) payload = body;
     else if (body) { payload = new URLSearchParams(body).toString(); headers['content-type'] = 'application/x-www-form-urlencoded'; }
     const res = await fetch(base + url, { method, headers, body: payload, redirect: 'manual' });
-    const set = res.headers.get('set-cookie');
-    if (set) this.cookie = set.split(';')[0];
+    for (const c of res.headers.getSetCookie()) {
+      const [pair] = c.split(';');
+      const i = pair.indexOf('=');
+      this.jar[pair.slice(0, i)] = pair.slice(i + 1);
+    }
     const text = await res.text();
     return { status: res.status, location: res.headers.get('location'), text, headers: res.headers };
   }
@@ -213,4 +217,33 @@ test('worker cannot open company pages and logout works', async () => {
   const r = await worker.post('/logout', {}, '/');
   assert.strictEqual(r.location, '/');
   assert.strictEqual((await worker.get('/worker')).status, 302);
+});
+
+test('language menu switches the site language and direction', async () => {
+  const c = new Client();
+  let r = await c.get('/lang?code=bn&next=/demands');
+  assert.strictEqual(r.location, '/demands');
+  r = await c.get('/demands');
+  assert.match(r.text, /<html lang="bn" dir="ltr">/);
+  assert.match(r.text, /কাজের ডিমান্ড/);
+  assert.match(r.text, /ইলেকট্রিশিয়ান/); // category name translated
+
+  await c.get('/lang?code=ar&next=/');
+  r = await c.get('/');
+  assert.match(r.text, /<html lang="ar" dir="rtl">/);
+  assert.match(r.text, /وظّف العمال في المملكة العربية السعودية/);
+
+  await c.get('/lang?code=ur&next=/');
+  r = await c.get('/login');
+  assert.match(r.text, /dir="rtl"/);
+
+  // Flash messages come in the chosen language too.
+  r = await c.post('/login', { email: 'nobody@test.local', password: 'wrongpass' }, '/login');
+  assert.match(r.text, /ای میل یا پاس ورڈ غلط ہے/);
+
+  // Unknown language falls back to English; off-site redirects are refused.
+  r = await c.get('/lang?code=xx&next=//evil.example');
+  assert.strictEqual(r.location, '/');
+  r = await c.get('/');
+  assert.match(r.text, /<html lang="en" dir="ltr">/);
 });

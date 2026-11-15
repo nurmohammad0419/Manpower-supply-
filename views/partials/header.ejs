@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="<%= lang %>" dir="<%= dir %>">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= title %> · ManpowerHub KSA</title>
+  <title><%= t(title) %> · ManpowerHub KSA</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -11,27 +11,34 @@
   <div class="wrap topbar-inner">
     <a class="brand" href="/"><span class="logo">MH</span> ManpowerHub <small>KSA</small></a>
     <nav class="nav">
-      <a href="/demands" class="<%= path.startsWith('/demands') ? 'active' : '' %>">Job Demands</a>
+      <a href="/demands" class="<%= path.startsWith('/demands') ? 'active' : '' %>"><%= t('Job Demands') %></a>
       <% if (!user) { %>
-        <a href="/login">Login</a>
-        <a class="btn btn-sm" href="/register">Register</a>
+        <a href="/login"><%= t('Login') %></a>
+        <a class="btn btn-sm" href="/register"><%= t('Register') %></a>
       <% } else { %>
         <% if (user.role === 'company') { %>
-          <a href="/company" class="<%= path === '/company' ? 'active' : '' %>">Dashboard</a>
-          <a href="/company/demands/new">+ Post Demand</a>
-          <a href="/company/profile">Profile</a>
+          <a href="/company" class="<%= path === '/company' ? 'active' : '' %>"><%= t('Dashboard') %></a>
+          <a href="/company/demands/new"><%= t('+ Post Demand') %></a>
+          <a href="/company/profile"><%= t('Profile') %></a>
         <% } else if (user.role === 'worker') { %>
-          <a href="/worker" class="<%= path === '/worker' ? 'active' : '' %>">My Applications</a>
-          <a href="/worker/documents">Documents</a>
-          <a href="/worker/profile">Profile</a>
+          <a href="/worker" class="<%= path === '/worker' ? 'active' : '' %>"><%= t('My Applications') %></a>
+          <a href="/worker/documents"><%= t('Documents') %></a>
+          <a href="/worker/profile"><%= t('Profile') %></a>
         <% } else { %>
-          <a href="/admin">Admin</a>
+          <a href="/admin"><%= t('Admin') %></a>
         <% } %>
         <form method="post" action="/logout" class="inline">
           <input type="hidden" name="_csrf" value="<%= csrf %>">
-          <button class="linklike" title="Log out <%= user.name %>">Logout</button>
+          <button class="linklike"><%= t('Logout') %></button>
         </form>
       <% } %>
+      <form method="get" action="/lang" class="lang-form">
+        <input type="hidden" name="next" value="<%= currentUrl %>">
+        <select name="code" aria-label="Language" onchange="this.form.submit()">
+          <% Object.entries(LANGUAGES).forEach(([code, l]) => { %><option value="<%= code %>" <%= code === lang ? 'selected' : '' %>><%= l.name %></option><% }) %>
+        </select>
+        <noscript><button class="btn btn-sm">OK</button></noscript>
+      </form>
     </nav>
   </div>
 </header>

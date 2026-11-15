@@ -33,4 +33,9 @@ const APP_STATUS = {
   withdrawn: 'Withdrawn',
 };
 
-module.exports = { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS };
+const NATIONALITIES = [
+  'Bangladesh', 'India', 'Pakistan', 'Nepal', 'Philippines', 'Sri Lanka', 'Egypt', 'Sudan', 'Yemen',
+  'Indonesia', 'Kenya', 'Uganda', 'Ethiopia',
+];
+
+module.exports = { CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES };

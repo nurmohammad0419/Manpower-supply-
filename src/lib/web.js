@@ -274,7 +274,7 @@ function upload({ dir, maxFileSize, maxFiles, allowedFields }) {
         if (!allowedFields.includes(p.name)) continue;
         if (p.content.length > maxFileSize) throw Object.assign(new Error('Each file must be 5 MB or smaller.'), { userError: true });
         const mime = sniffMime(p.content);
-        if (!mime) throw Object.assign(new Error(`"${p.filename}" is not a PDF, JPG, PNG or WEBP file.`), { userError: true });
+        if (!mime) throw Object.assign(new Error('"{file}" is not a PDF, JPG, PNG or WEBP file.'), { userError: true, params: { file: path.basename(p.filename) } });
         (files[p.name] ||= []).push({ originalname: path.basename(p.filename).slice(0, 200), mimetype: mime, content: p.content });
       }
       // Only write files once the whole request is valid.
@@ -290,7 +290,7 @@ function upload({ dir, maxFileSize, maxFiles, allowedFields }) {
       req.files = files;
       next();
     } catch (e) {
-      if (e.code === 'LIMIT_FILE_SIZE') e.message = 'Upload is too large. Each file must be 5 MB or smaller.';
+      if (e.code === 'LIMIT_FILE_SIZE') e.message = 'Each file must be 5 MB or smaller.';
       e.userError = true;
       next(e);
     }

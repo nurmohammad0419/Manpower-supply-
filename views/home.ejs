@@ -1,48 +1,48 @@
 <%- include('partials/header') %>
 <section class="hero">
   <div>
-    <h1>Hire workers in Saudi Arabia — fully digital.</h1>
-    <p class="lead">Companies post manpower demands online. Workers see the rate, hours and conditions, apply with their documents, and get hired — no paper demand letters, no running between suppliers.</p>
+    <h1><%= t('Hire workers in Saudi Arabia — fully digital.') %></h1>
+    <p class="lead"><%= t('Companies post manpower demands online. Workers see the rate, hours and conditions, apply with their documents, and get hired — no paper demand letters, no running between suppliers.') %></p>
     <div class="hero-actions">
-      <a class="btn btn-lg" href="/register/company">I need workers (Company)</a>
-      <a class="btn btn-lg btn-alt" href="/register/worker">I want a job (Worker)</a>
+      <a class="btn btn-lg" href="/register/company"><%= t('I need workers (Company)') %></a>
+      <a class="btn btn-lg btn-alt" href="/register/worker"><%= t('I want a job (Worker)') %></a>
     </div>
   </div>
   <div class="stats">
-    <div class="stat"><b><%= stats.openDemands %></b><span>Open demands</span></div>
-    <div class="stat"><b><%= stats.positions %></b><span>Positions</span></div>
-    <div class="stat"><b><%= stats.companies %></b><span>Verified companies</span></div>
-    <div class="stat"><b><%= stats.workers %></b><span>Registered workers</span></div>
+    <div class="stat"><b><%= stats.openDemands %></b><span><%= t('Open demands') %></span></div>
+    <div class="stat"><b><%= stats.positions %></b><span><%= t('Positions') %></span></div>
+    <div class="stat"><b><%= stats.companies %></b><span><%= t('Verified companies') %></span></div>
+    <div class="stat"><b><%= stats.workers %></b><span><%= t('Registered workers') %></span></div>
   </div>
 </section>
 
 <section class="how">
   <div class="card">
-    <h2>For companies</h2>
+    <h2><%= t('For companies') %></h2>
     <ol>
-      <li>Register your company once (CR number, contact).</li>
-      <li>Post a demand: category, number of workers, rate in SAR, hours, food / accommodation / transport, required documents.</li>
-      <li>Review applicants and their documents online.</li>
-      <li>Shortlist and hire — the demand tracks how many are filled.</li>
+      <li><%= t('Register your company once (CR number, contact).') %></li>
+      <li><%= t('Post a demand: category, number of workers, rate in SAR, hours, food / accommodation / transport, required documents.') %></li>
+      <li><%= t('Review applicants and their documents online.') %></li>
+      <li><%= t('Shortlist and hire — the demand tracks how many are filled.') %></li>
     </ol>
   </div>
   <div class="card">
-    <h2>For workers</h2>
+    <h2><%= t('For workers') %></h2>
     <ol>
-      <li>Register and upload your Iqama, Passport, Photo and CV once.</li>
-      <li>Browse demands — see the company, rate, hours and conditions.</li>
-      <li>Apply with one click; upload any extra document that is required.</li>
-      <li>Track your status: Applied → Shortlisted → Hired.</li>
+      <li><%= t('Register and upload your Iqama, Passport, Photo and CV once.') %></li>
+      <li><%= t('Browse demands — see the company, rate, hours and conditions.') %></li>
+      <li><%= t('Apply with one click; upload any extra document that is required.') %></li>
+      <li><%= t('Track your status: Applied → Shortlisted → Hired.') %></li>
     </ol>
   </div>
 </section>
 
 <div class="section-head">
-  <h2>Latest demands</h2>
-  <a href="/demands">See all →</a>
+  <h2><%= t('Latest demands') %></h2>
+  <a href="/demands"><%= t('See all') %> <span class="arr">→</span></a>
 </div>
 <% if (!latest.length) { %>
-  <div class="card empty">No open demands yet. Companies: <a href="/register/company">register</a> and post the first one.</div>
+  <div class="card empty"><%= t('No open demands yet.') %> <a href="/register/company"><%= t('Register your company') %></a></div>
 <% } else { %>
   <div class="grid"><% latest.forEach(d => { %><%- include('partials/demand-card', { d }) %><% }) %></div>
 <% } %>

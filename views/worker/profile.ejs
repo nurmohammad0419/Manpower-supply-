@@ -1,14 +1,14 @@
 <%- include('../partials/header') %>
 <div class="card medium">
-  <h1>My profile</h1>
+  <h1><%= t('My profile') %></h1>
   <form method="post" action="/worker/profile">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <%- include('../partials/worker-fields') %>
     <div class="row2">
-      <label>Email <input value="<%= form.email %>" disabled></label>
-      <label>Phone (WhatsApp) <input name="phone" value="<%= form.phone || '' %>"></label>
+      <label><%= t('Email') %> <input value="<%= form.email %>" disabled dir="ltr"></label>
+      <label><%= t('Phone (WhatsApp)') %> <input name="phone" value="<%= form.phone || '' %>" dir="ltr"></label>
     </div>
-    <button class="btn">Save</button>
+    <button class="btn"><%= t('Save') %></button>
   </form>
 </div>
 <%- include('../partials/footer') %>

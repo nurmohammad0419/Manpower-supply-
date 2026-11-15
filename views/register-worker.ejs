@@ -1,13 +1,13 @@
 <%- include('partials/header') %>
 <div class="card medium">
-  <h1>Worker registration</h1>
-  <p class="muted">Free for workers. After registering, upload your documents once and apply to any job.</p>
-  <% if (locals.error) { %><div class="alert alert-error"><%= error %></div><% } %>
+  <h1><%= t('Worker registration') %></h1>
+  <p class="muted"><%= t('Free for workers. After registering, upload your documents once and apply to any job.') %></p>
+  <% if (locals.error) { %><div class="alert alert-error"><%= t(error) %></div><% } %>
   <form method="post" action="/register/worker">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <fieldset><legend>Personal details</legend><%- include('partials/worker-fields') %></fieldset>
+    <fieldset><legend><%= t('Personal details') %></legend><%- include('partials/worker-fields') %></fieldset>
     <%- include('partials/account-fields') %>
-    <button class="btn full">Register</button>
+    <button class="btn full"><%= t('Register') %></button>
   </form>
 </div>
 <%- include('partials/footer') %>

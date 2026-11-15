@@ -1,14 +1,14 @@
 <div class="row2">
-  <label>Company name * <input name="company_name" required value="<%= form.company_name || '' %>"></label>
-  <label>Commercial Registration (CR) No. * <input name="cr_number" required value="<%= form.cr_number || '' %>" <%= locals.lockCr ? 'disabled' : '' %>></label>
+  <label><%= t('Company name') %> * <input name="company_name" required value="<%= form.company_name || '' %>"></label>
+  <label><%= t('Commercial Registration (CR) No.') %> * <input name="cr_number" required value="<%= form.cr_number || '' %>" dir="ltr" <%= locals.lockCr ? 'disabled' : '' %>></label>
 </div>
 <div class="row2">
-  <label>Contact person * <input name="contact_person" required value="<%= form.contact_person || '' %>"></label>
-  <label>City *
+  <label><%= t('Contact person') %> * <input name="contact_person" required value="<%= form.contact_person || '' %>"></label>
+  <label><%= t('City') %> *
     <select name="city" required>
-      <option value="">Choose…</option>
-      <% CITIES.forEach(c => { %><option <%= form.city === c ? 'selected' : '' %>><%= c %></option><% }) %>
+      <option value=""><%= t('Choose…') %></option>
+      <% CITIES.forEach(c => { %><option value="<%= c %>" <%= form.city === c ? 'selected' : '' %>><%= t(c) %></option><% }) %>
     </select>
   </label>
 </div>
-<label>Address <input name="address" value="<%= form.address || '' %>"></label>
+<label><%= t('Address') %> <input name="address" value="<%= form.address || '' %>"></label>

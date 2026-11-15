@@ -1,11 +1,11 @@
 <fieldset>
-  <legend>Login details</legend>
+  <legend><%= t('Login details') %></legend>
   <div class="row2">
-    <label>Email * <input type="email" name="email" required value="<%= form.email || '' %>" autocomplete="email"></label>
-    <label>Phone (WhatsApp) * <input type="tel" name="phone" required value="<%= form.phone || '' %>" placeholder="+966 5x xxx xxxx"></label>
+    <label><%= t('Email') %> * <input type="email" name="email" required value="<%= form.email || '' %>" autocomplete="email" dir="ltr"></label>
+    <label><%= t('Phone (WhatsApp)') %> * <input type="tel" name="phone" required value="<%= form.phone || '' %>" placeholder="+966 5x xxx xxxx" dir="ltr"></label>
   </div>
   <div class="row2">
-    <label>Password * <input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
-    <label>Confirm password * <input type="password" name="password_confirm" required minlength="6" autocomplete="new-password"></label>
+    <label><%= t('Password') %> * <input type="password" name="password" required minlength="6" autocomplete="new-password" dir="ltr"></label>
+    <label><%= t('Confirm password') %> * <input type="password" name="password_confirm" required minlength="6" autocomplete="new-password" dir="ltr"></label>
   </div>
 </fieldset>

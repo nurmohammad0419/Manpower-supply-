@@ -1,33 +1,33 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Demand Letter #<%= demand.id %></title><link rel="stylesheet" href="/style.css"></head>
+<html lang="<%= lang %>" dir="<%= dir %>"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= t('Demand Letter') %> #<%= demand.id %></title><link rel="stylesheet" href="/style.css"></head>
 <body class="letter-body">
 <div class="letter">
   <div class="letter-head">
-    <div><h1><%= demand.company_name %></h1><div>CR No: <%= demand.cr_number %> · <%= demand.company_city %></div></div>
-    <div class="right"><b>DEMAND LETTER</b><br>Ref: MH-<%= String(demand.id).padStart(5, '0') %><br>Date: <%= fmtDate(demand.created_at) %></div>
+    <div><h1><bdi><%= demand.company_name %></bdi></h1><div><%= t('CR No.') %>: <%= demand.cr_number %> · <%= t(demand.company_city) %></div></div>
+    <div class="right"><b><%= t('DEMAND LETTER') %></b><br><%= t('Ref') %>: MH-<%= String(demand.id).padStart(5, '0') %><br><%= t('Date') %>: <%= fmtDate(demand.created_at) %></div>
   </div>
-  <p>We require the following manpower. Interested candidates may apply online at ManpowerHub KSA with the documents listed below.</p>
+  <p><%= t('We require the following manpower. Interested candidates may apply online at ManpowerHub KSA with the documents listed below.') %></p>
   <table class="letter-table">
-    <tr><th>Position</th><td><%= demand.title %> (<%= demand.category %>)</td></tr>
-    <tr><th>Number of workers</th><td><%= demand.quantity %></td></tr>
-    <tr><th>Salary / Rate</th><td><%= demand.salary_amount %> SAR <%= SALARY_TYPES[demand.salary_type] %></td></tr>
-    <tr><th>Working hours</th><td><%= demand.hours_per_day %> hours/day, <%= demand.days_per_week %> days/week</td></tr>
-    <tr><th>Overtime</th><td><%= demand.overtime || '—' %></td></tr>
-    <tr><th>Duration</th><td><%= demand.duration %></td></tr>
-    <tr><th>Work location</th><td><%= demand.location_city %><%= demand.work_site ? ' — ' + demand.work_site : '' %></td></tr>
-    <tr><th>Food</th><td><%= yesNo(demand.food) %></td></tr>
-    <tr><th>Accommodation</th><td><%= yesNo(demand.accommodation) %></td></tr>
-    <tr><th>Transport</th><td><%= yesNo(demand.transport) %></td></tr>
-    <tr><th>Start date</th><td><%= demand.start_date ? fmtDate(demand.start_date) : 'Immediate' %></td></tr>
-    <tr><th>Last date to apply</th><td><%= demand.deadline ? fmtDate(demand.deadline) : 'Until filled' %></td></tr>
-    <tr><th>Documents required</th><td><%= demand.required_docs.split(',').filter(Boolean).map(d => DOC_TYPES[d]).join(', ') || '—' %></td></tr>
+    <tr><th><%= t('Position') %></th><td><bdi><%= demand.title %></bdi> (<%= t(demand.category) %>)</td></tr>
+    <tr><th><%= t('Number of workers') %></th><td><%= demand.quantity %></td></tr>
+    <tr><th><%= t('Salary / Rate') %></th><td><%= demand.salary_amount %> <%= t('SAR') %> <%= t(SALARY_TYPES[demand.salary_type]) %></td></tr>
+    <tr><th><%= t('Working hours') %></th><td><%= t('{h} hours/day, {d} days/week', { h: demand.hours_per_day, d: demand.days_per_week }) %></td></tr>
+    <tr><th><%= t('Overtime') %></th><td><bdi><%= demand.overtime || '—' %></bdi></td></tr>
+    <tr><th><%= t('Contract duration') %></th><td><bdi><%= demand.duration %></bdi></td></tr>
+    <tr><th><%= t('Work location') %></th><td><%= t(demand.location_city) %><% if (demand.work_site) { %> — <bdi><%= demand.work_site %></bdi><% } %></td></tr>
+    <tr><th><%= t('Food') %></th><td><%= yesNo(demand.food) %></td></tr>
+    <tr><th><%= t('Accommodation') %></th><td><%= yesNo(demand.accommodation) %></td></tr>
+    <tr><th><%= t('Transport') %></th><td><%= yesNo(demand.transport) %></td></tr>
+    <tr><th><%= t('Start date') %></th><td><%= demand.start_date ? fmtDate(demand.start_date) : t('Immediate') %></td></tr>
+    <tr><th><%= t('Last date to apply') %></th><td><%= demand.deadline ? fmtDate(demand.deadline) : t('Until filled') %></td></tr>
+    <tr><th><%= t('Documents required') %></th><td><%= demand.required_docs.split(',').filter(Boolean).map(d => t(DOC_TYPES[d])).join(', ') || '—' %></td></tr>
   </table>
-  <% if (demand.requirements) { %><h3>Other requirements</h3><p class="prewrap"><%= demand.requirements %></p><% } %>
+  <% if (demand.requirements) { %><h3><%= t('Other requirements') %></h3><p class="prewrap" dir="auto"><bdi><%= demand.requirements %></bdi></p><% } %>
   <div class="letter-sign">
-    <div>Contact person: <b><%= demand.contact_person %></b></div>
-    <div class="sigline">Authorized signature &amp; stamp</div>
+    <div><%= t('Contact person') %>: <b><bdi><%= demand.contact_person %></bdi></b></div>
+    <div class="sigline"><%= t('Authorized signature & stamp') %></div>
   </div>
-  <button class="btn noprint" onclick="window.print()">Print / Save as PDF</button>
+  <button class="btn noprint" onclick="window.print()"><%= t('Print / Save as PDF') %></button>
 </div>
 </body></html>

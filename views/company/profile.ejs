@@ -1,15 +1,15 @@
 <%- include('../partials/header') %>
 <div class="card medium">
-  <h1>Company profile</h1>
-  <p>Verification status: <span class="badge badge-<%= form.status === 'approved' ? 'hired' : form.status === 'rejected' ? 'rejected' : 'applied' %>"><%= form.status %></span></p>
+  <h1><%= t('Company profile') %></h1>
+  <p><%= t('Verification status') %>: <span class="badge badge-<%= form.status === 'approved' ? 'hired' : form.status === 'rejected' ? 'rejected' : 'applied' %>"><%= t({ approved: 'Approved', rejected: 'Rejected', pending: 'Pending' }[form.status]) %></span></p>
   <form method="post" action="/company/profile">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <%- include('../partials/company-fields', { lockCr: true }) %>
     <div class="row2">
-      <label>Email <input value="<%= form.email %>" disabled></label>
-      <label>Phone <input name="phone" value="<%= form.phone || '' %>"></label>
+      <label><%= t('Email') %> <input value="<%= form.email %>" disabled dir="ltr"></label>
+      <label><%= t('Phone') %> <input name="phone" value="<%= form.phone || '' %>" dir="ltr"></label>
     </div>
-    <button class="btn">Save</button>
+    <button class="btn"><%= t('Save') %></button>
   </form>
 </div>
 <%- include('../partials/footer') %>
