@@ -9,6 +9,7 @@ const {
   KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES, TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS,
 } = require('./constants');
 const { notifyUser } = require('./notify');
+const jobAlerts = require('./jobAlerts');
 const {
   LANGUAGES, translator, pickLanguage, formatMonth, formatMoney,
 } = require('./i18n');
@@ -315,7 +316,9 @@ app.post('/register/worker', (req, res) => {
     || (!str(b.phone) && 'Phone number is required.');
   const custom = readCustomFields(req);
   if (err || custom.error) {
-    return res.status(400).render('register-worker', { title: 'Worker Registration', form: b, error: err || custom.error, fields: activeFields(), values: customFormValues(b) });
+    return res.status(400).render('register-worker', {
+      title: 'Worker Registration', form: { ...b, job_alerts: b.job_alerts || '0' }, error: err || custom.error, fields: activeFields(), values: customFormValues(b),
+    });
   }
   const tx = db.transaction(() => {
     const info = db.prepare('INSERT INTO users (role, email, phone, password_hash, name, lang, notify_channel) VALUES (?,?,?,?,?,?,?)')
@@ -324,6 +327,8 @@ app.post('/register/worker', (req, res) => {
       VALUES (?,?,?,?,?,?,?,?,?,?)`).run(info.lastInsertRowid, str(b.full_name, 200), str(b.nationality, 100), str(b.iqama_number, 30),
       str(b.passport_number, 30), str(b.profession, 100), Math.max(0, int(b.experience_years)), str(b.skills, 1000), str(b.city, 100), str(b.date_of_birth, 10));
     saveCustomFields(info.lastInsertRowid, custom.values);
+    jobAlerts.savePositions(info.lastInsertRowid, jobAlerts.positionsFromForm(str(b.profession, 100), b.positions));
+    db.prepare('UPDATE workers SET job_alerts = ? WHERE user_id = ?').run(b.job_alerts === '1' ? 1 : 0, info.lastInsertRowid);
     return info.lastInsertRowid;
   });
   const id = tx();
@@ -401,7 +406,9 @@ app.post('/company/demands', companyOnly, (req, res) => {
     duration, location_city, work_site, food, accommodation, transport, overtime, requirements, required_docs, start_date, deadline)
     VALUES (@company_id,@title,@category,@quantity,@salary_amount,@salary_type,@hours_per_day,@days_per_week,@duration,@location_city,
     @work_site,@food,@accommodation,@transport,@overtime,@requirements,@required_docs,@start_date,@deadline)`).run({ ...d, company_id: req.session.user.id });
-  flash(req, 'success', 'Demand posted. Workers can now see and apply to it.');
+  const told = jobAlerts.announceDemand(info.lastInsertRowid);
+  if (told) flash(req, 'success', 'Demand posted. {n} workers with this position were sent a message.', { n: told });
+  else flash(req, 'success', 'Demand posted. Workers can now see and apply to it.');
   res.redirect('/company/demands/' + info.lastInsertRowid);
 });
 
@@ -466,7 +473,7 @@ app.get('/company/applications/:id', companyOnly, (req, res) => {
   const a = companyApplication(req, res); if (!a) return;
   const worker = db.prepare('SELECT w.*, u.email, u.phone FROM workers w JOIN users u ON u.id = w.user_id WHERE w.user_id = ?').get(a.worker_id);
   const documents = db.prepare('SELECT * FROM documents WHERE worker_id = ? ORDER BY doc_type, uploaded_at DESC').all(a.worker_id);
-  res.render('company/application', { title: worker.full_name, a, worker, documents, extras: workerExtras(a.worker_id) });
+  res.render('company/application', { title: worker.full_name, a, worker, documents, extras: workerExtras(a.worker_id), positions: jobAlerts.workerPositions(a.worker_id) });
 });
 
 app.post('/company/applications/:id/status', companyOnly, (req, res) => {
@@ -537,7 +544,8 @@ app.get('/worker', workerOnly, (req, res) => {
     SELECT d.*, c.company_name, c.logo_file FROM demands d JOIN companies c ON c.user_id = d.company_id
     WHERE d.status='open' AND c.status='approved' AND (d.deadline IS NULL OR d.deadline = '' OR d.deadline >= date('now'))
       AND d.id NOT IN (SELECT demand_id FROM applications WHERE worker_id = ?)
-    ORDER BY (d.category = ?) DESC, d.created_at DESC LIMIT 4`).all(req.session.user.id, worker.profession);
+    ORDER BY (d.category IN (SELECT category FROM worker_positions WHERE worker_id = ?)) DESC, d.created_at DESC LIMIT 4`)
+    .all(req.session.user.id, req.session.user.id);
   res.render('worker/dashboard', { title: 'My Dashboard', worker, applications, docTypes, recommended });
 });
 
@@ -565,6 +573,7 @@ app.post('/worker/documents/:id/delete', workerOnly, (req, res) => {
 
 app.get('/worker/profile', workerOnly, (req, res) => {
   const worker = db.prepare('SELECT w.*, u.email, u.phone, u.notify_channel FROM workers w JOIN users u ON u.id = w.user_id WHERE w.user_id = ?').get(req.session.user.id);
+  worker.positions = jobAlerts.workerPositions(req.session.user.id);
   res.render('worker/profile', { title: 'My Profile', form: worker, fields: activeFields(), values: fieldValues(req.session.user.id) });
 });
 
@@ -583,6 +592,8 @@ app.post('/worker/profile', workerOnly, (req, res) => {
     languages=@languages, driving_license=@driving_license, expected_salary=@expected_salary, available_from=@available_from,
     work_history=@work_history, bank_name=@bank_name, iban=@iban WHERE user_id=@id`).run({ ...workerExtraColumns(b), id: req.session.user.id });
   saveCustomFields(req.session.user.id, custom.values);
+  jobAlerts.savePositions(req.session.user.id, jobAlerts.positionsFromForm(str(b.profession, 100), b.positions));
+  db.prepare('UPDATE workers SET job_alerts = ? WHERE user_id = ?').run(b.job_alerts === '1' ? 1 : 0, req.session.user.id);
   db.prepare(`UPDATE workers SET full_name=?, nationality=?, iqama_number=?, passport_number=?, profession=?, experience_years=?, skills=?, city=?, date_of_birth=? WHERE user_id=?`)
     .run(str(b.full_name, 200), str(b.nationality, 100), str(b.iqama_number, 30), str(b.passport_number, 30), str(b.profession, 100),
       Math.max(0, int(b.experience_years)), str(b.skills, 1000), str(b.city, 100), str(b.date_of_birth, 10), req.session.user.id);
@@ -687,6 +698,7 @@ app.post('/admin/companies/:id/status', adminOnly, (req, res) => {
   db.prepare('UPDATE companies SET status = ? WHERE user_id = ?').run(status, req.params.id);
   if (before && status === 'approved' && before.status !== 'approved') {
     notifyUser(Number(req.params.id), 'ManpowerHub KSA: Your company "{company}" has been approved. Your demands are now visible to workers.', { company: before.company_name }, '/company');
+    jobAlerts.announceCompanyDemands(Number(req.params.id));
   }
   flash(req, 'success', { approved: 'Company approved.', rejected: 'Company rejected.', pending: 'Company set to pending.' }[status]);
   res.redirect('/admin');
@@ -696,7 +708,7 @@ app.get('/admin/workers/:id', adminOnly, (req, res) => {
   const worker = db.prepare('SELECT w.*, u.email, u.phone FROM workers w JOIN users u ON u.id = w.user_id WHERE w.user_id = ?').get(req.params.id);
   if (!worker) return res.status(404).render('error', { title: 'Not found', message: 'Worker not found.' });
   const documents = db.prepare('SELECT * FROM documents WHERE worker_id = ? ORDER BY doc_type').all(worker.user_id);
-  res.render('admin/worker', { title: worker.full_name, worker, documents, extras: workerExtras(worker.user_id) });
+  res.render('admin/worker', { title: worker.full_name, worker, documents, extras: workerExtras(worker.user_id), positions: jobAlerts.workerPositions(worker.user_id) });
 });
 
 // Admin chooses extra information to ask workers for.

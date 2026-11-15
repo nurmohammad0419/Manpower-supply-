@@ -4,3 +4,6 @@
   </select>
   <span class="hint"><%= t('We send a message to your phone number when something changes.') %></span>
 </label>
+<% if (locals.forWorker) { %>
+  <label class="check"><input type="checkbox" name="job_alerts" value="1" <%= form.job_alerts === undefined || String(form.job_alerts) === '1' ? 'checked' : '' %>> <%= t('Send me new jobs that match my positions') %></label>
+<% } %>

@@ -8,7 +8,7 @@
       <label><%= t('Email') %> <input value="<%= form.email %>" disabled dir="ltr"></label>
       <label><%= t('Phone (WhatsApp)') %> <input name="phone" value="<%= form.phone || '' %>" dir="ltr"></label>
     </div>
-    <%- include('../partials/notify-field') %>
+    <%- include('../partials/notify-field', { forWorker: true }) %>
     <fieldset><legend><%= t('More details (optional)') %></legend>
       <p class="hint"><%= t('Companies see these details when you apply. More details help you get hired faster.') %></p>
       <div class="row2">

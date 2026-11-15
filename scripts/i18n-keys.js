@@ -26,7 +26,7 @@ function collectKeys() {
     for (const m of src.matchAll(/\b(?:sent|failed|not_sent|pending): '([^']+)'/g)) add(m[1]);
   }
 
-  const server = ['src/server.js', 'src/timesheets.js'].map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+  const server = ['src/server.js', 'src/timesheets.js', 'src/jobAlerts.js'].map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
   const patterns = [
     /flash\(req, [^,]+, '([^']+)'/g,
     /\b(?:title|message|error): '([^']+)'/g,
@@ -36,6 +36,7 @@ function collectKeys() {
     /\b(?:yes|no|allowance|approved|rejected|pending): '([^']+)'/g,
     /\b(?:shortlisted|hired): '([^']+)'/g,
     /notifyUser\([^,]+, '([^']+)'/g,
+    /notifyUser\(w\.worker_id, '([^']+)'/g,
     /req\.t\('([^']+)'/g,
     /fail\('([^']+)'\)/g,
     /notFound\(res, '([^']+)'\)/g,

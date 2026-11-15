@@ -22,6 +22,14 @@
     </select>
   </label>
 </div>
+<% const pos = [].concat(form.positions || []); %>
+<div class="label"><%= t('Other positions you can work as') %></div>
+<p class="hint"><%= t('Choose all that apply. You get a message when a new job is posted for any of your positions.') %></p>
+<div class="checks positions">
+  <% CATEGORIES.forEach(c => { %>
+    <label class="check"><input type="checkbox" name="positions" value="<%= c %>" <%= pos.includes(c) ? 'checked' : '' %>> <%= t(c) %></label>
+  <% }) %>
+</div>
 <div class="row2">
   <label><%= t('Date of birth') %> <input type="date" name="date_of_birth" value="<%= form.date_of_birth || '' %>"></label>
   <label><%= t('Skills / languages') %> <input name="skills" value="<%= form.skills || '' %>" placeholder="<%= t('e.g. Shuttering, tiles; Arabic, Hindi') %>"></label>

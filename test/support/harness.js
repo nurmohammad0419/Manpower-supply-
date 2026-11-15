@@ -29,7 +29,12 @@ function startApp(env = {}) {
       if (cookie) headers.cookie = cookie;
       let payload;
       if (body instanceof FormData) payload = body;
-      else if (body) { payload = new URLSearchParams(body).toString(); headers['content-type'] = 'application/x-www-form-urlencoded'; }
+      else if (body) {
+        const params = new URLSearchParams();
+        for (const [k, v] of Object.entries(body)) for (const item of [].concat(v)) params.append(k, item);
+        payload = params.toString();
+        headers['content-type'] = 'application/x-www-form-urlencoded';
+      }
       const res = await fetch(ctx.base + url, { method, headers, body: payload, redirect: 'manual' });
       for (const c of res.headers.getSetCookie()) {
         const [pair] = c.split(';');

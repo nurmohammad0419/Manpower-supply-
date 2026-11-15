@@ -1,3 +1,4 @@
+<% if (locals.positions && positions.length) { %><tr><th><%= t('Work positions') %></th><td><%= positions.map(p => t(p)).join(', ') %></td></tr><% } %>
 <% if (worker.iqama_expiry) { %><tr><th><%= t('Iqama expiry date') %></th><td><%= fmtDate(worker.iqama_expiry) %></td></tr><% } %>
 <% if (worker.passport_expiry) { %><tr><th><%= t('Passport expiry date') %></th><td><%= fmtDate(worker.passport_expiry) %></td></tr><% } %>
 <% if (worker.kafala_transfer) { %><tr><th><%= t('Sponsorship (kafala) transfer') %></th><td><%= t(KAFALA_OPTIONS[worker.kafala_transfer]) %></td></tr><% } %>

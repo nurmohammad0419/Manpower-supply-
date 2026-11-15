@@ -8,7 +8,7 @@
     <fieldset><legend><%= t('Personal details') %></legend><%- include('partials/worker-fields') %></fieldset>
     <% if (fields.length) { %><fieldset><legend><%= t('More details') %></legend><%- include('partials/custom-fields') %></fieldset><% } %>
     <%- include('partials/account-fields') %>
-    <%- include('partials/notify-field') %>
+    <%- include('partials/notify-field', { forWorker: true }) %>
     <button class="btn full"><%= t('Register') %></button>
   </form>
 </div>

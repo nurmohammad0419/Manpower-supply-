@@ -177,6 +177,16 @@ CREATE TABLE IF NOT EXISTS timesheet_lines (
 CREATE INDEX IF NOT EXISTS idx_timesheet_lines_worker ON timesheet_lines(worker_id);
 `);
 
+db.exec(`
+-- Positions a worker can work in (main profession plus others). Used for new-job alerts.
+CREATE TABLE IF NOT EXISTS worker_positions (
+  worker_id INTEGER NOT NULL REFERENCES workers(user_id) ON DELETE CASCADE,
+  category TEXT NOT NULL,
+  PRIMARY KEY (worker_id, category)
+);
+CREATE INDEX IF NOT EXISTS idx_worker_positions_category ON worker_positions(category);
+`);
+
 // Add columns introduced after the first release (safe to run on every start).
 function addColumn(table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
@@ -195,6 +205,10 @@ addColumn('workers', 'available_from', 'TEXT');
 addColumn('workers', 'work_history', 'TEXT');
 addColumn('workers', 'bank_name', 'TEXT');
 addColumn('workers', 'iban', 'TEXT');
+addColumn('workers', 'job_alerts', 'INTEGER NOT NULL DEFAULT 1');
+addColumn('demands', 'announced_at', 'TEXT');
+// Workers registered before positions existed: their main profession is their position.
+db.exec('INSERT OR IGNORE INTO worker_positions (worker_id, category) SELECT user_id, profession FROM workers');
 
 // Seed an admin account on first run.
 const adminEmail = (process.env.ADMIN_EMAIL || 'admin@manpower.local').toLowerCase();

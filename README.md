@@ -15,7 +15,7 @@ Companies in Saudi Arabia post manpower demands online, workers browse them and 
 - Tracks hired vs. needed (cannot hire more than the demand quantity); close or re-open a demand
 
 **Worker (কর্মী)**
-- Register: name, nationality, Iqama number, passport number, profession, experience, skills
+- Register: name, nationality, Iqama number, passport number, main profession plus any other positions they can work in, experience, skills
 - Optional extra details in the profile: Iqama and passport expiry, sponsorship (kafala) transfer, Saudi driving license, languages, expected salary, available-from date, work history — companies see these when the worker applies
 - Upload documents once (Iqama, Passport, Photo, CV, license, medical, certificates) and reuse them for every application
 - Browse and search demands by keyword, category and city
@@ -37,6 +37,7 @@ Companies in Saudi Arabia post manpower demands online, workers browse them and 
 
 **WhatsApp / SMS notifications**
 - Worker: when shortlisted, hired (with the company's note) or not selected
+- Worker: **new job alerts** — when a company posts a demand, every worker with that position (main or extra) gets a message with the job, company, city, pay and a link. Demands from a company that is not approved yet are announced when the admin approves it; each demand is announced once. Workers can switch job alerts off in their profile.
 - Company: when a worker applies, when the admin approves the company, and when a timesheet is confirmed or sent back
 - Worker: when a timesheet is confirmed (hours, amount, payment status) and when the payment is made
 - Messages are written in each person's chosen language. Everyone can choose WhatsApp, SMS or no messages in their profile.
@@ -106,6 +107,7 @@ src/constants.js     job categories, document types, cities
 src/i18n.js          language list and translation lookup
 src/notify.js        WhatsApp / SMS messages (Meta, Twilio)
 src/timesheets.js    monthly timesheets, admin check, payments, payment slips
+src/jobAlerts.js     worker positions and new-job alerts
 src/locales/*.json   translations (English text → translated text)
 src/lib/web.js       small built-in web framework (routing, sessions, uploads)
 src/lib/template.js  EJS-style templates
