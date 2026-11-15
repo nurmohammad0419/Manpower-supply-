@@ -32,12 +32,16 @@ async function registerWorker(key, { profession, positions = [], alerts = true, 
   return c;
 }
 
-async function postDemand(category, title) {
+// Company posts a demand; the admin publishes it (unless publish is false).
+async function postDemand(category, title, { publish = true, ...overrides } = {}) {
   const r = await company.post('/company/demands', {
-    title, category, quantity: '3', salary_amount: '1800', salary_type: 'monthly', hours_per_day: '8', days_per_week: '6',
+    title, category, quantity: '3', salary_amount: '1800', salary_type: 'monthly', client_payment_days: '30', hours_per_day: '8', days_per_week: '6',
     duration: '1 year', location_city: 'Riyadh', required_docs: '',
   }, '/company');
-  return { id: r.location.split('/').pop(), page: await company.get(r.location) };
+  const id = r.location.split('/').pop();
+  if (!publish) return { id };
+  const p = await ctx.publish(admin, id, { worker_rate: '1500', worker_rate_type: 'monthly', ...overrides });
+  return { id, page: await admin.get(p.location) };
 }
 
 test('workers register with several positions', async () => {
@@ -53,38 +57,49 @@ test('workers register with several positions', async () => {
   assert.doesNotMatch((await workers.badal.get('/worker/profile')).text, /name="job_alerts" value="1" checked/);
 });
 
-test('a demand from a company that is not approved yet is announced when the admin approves it', async () => {
+test('workers are alerted when the admin publishes, not when the company posts', async () => {
   await company.post('/register/company', { company_name: 'Najd Power', cr_number: '7', contact_person: 'F', city: 'Riyadh', phone: '0509999999', email: 'najd@test.local', password: 'secret12', password_confirm: 'secret12', notify_channel: 'none' });
-  const { page } = await postDemand('Electrician', 'Site electrician');
-  assert.match(page.text, /Workers can now see and apply to it/);
+  await admin.post('/login', { email: 'admin@test.local', password: 'adminpass' });
+  const { id } = await postDemand('Electrician', 'Site electrician', { publish: false });
+  // The company is not approved yet: the admin cannot publish.
+  let r = await ctx.publish(admin, id, { worker_rate: '1500', worker_rate_type: 'monthly', show_company: '1' });
+  assert.match((await admin.get(r.location)).text, /Approve the company before publishing its demand/);
   await settle();
   assert.strictEqual(sent.length, 0);
 
-  await admin.post('/login', { email: 'admin@test.local', password: 'adminpass' });
   companyId = /\/admin\/companies\/(\d+)\/status/.exec((await admin.get('/admin')).text)[1];
   await admin.post(`/admin/companies/${companyId}/status`, { status: 'approved' }, '/admin');
+  await settle();
+  assert.strictEqual(sent.length, 0, 'approval alone does not publish');
+  r = await ctx.publish(admin, id, { worker_rate: '1500', worker_rate_type: 'monthly', show_company: '1' });
+  // anis (WhatsApp) and emon (SMS — no SMS provider here, so it is logged as not sent).
+  assert.match((await admin.get(r.location)).text, /Job published\. 2 workers with this position were sent a message/);
   await settle();
   // anis (extra position) — yes; badal (alerts off), dipu (no messages), chandan (plumber) — no; emon uses SMS (no SMS provider here).
   assert.deepStrictEqual(recipients(), ['966550000001']);
   const text = sent[0].text.body;
   assert.match(text, /ইলেকট্রিশিয়ান পদে নতুন কাজ/);
   assert.match(text, /Najd Power-এর "Site electrician", রিয়াদ/);
-  assert.match(text, /1800 রিয়াল প্রতি মাস/);
+  assert.match(text, /1500 রিয়াল প্রতি মাস/, 'workers see the worker rate');
+  assert.doesNotMatch(text, /1800/);
   assert.match(text, /https:\/\/jobs\.example\.com\/demands\/\d+/);
 
-  // Approving again does not announce the same demand twice.
+  // Saving the job post again, or re-approving the company, does not announce it twice.
+  await ctx.publish(admin, id, { worker_rate: '1550', worker_rate_type: 'monthly', show_company: '1' });
   await admin.post(`/admin/companies/${companyId}/status`, { status: 'rejected' }, '/admin');
   await admin.post(`/admin/companies/${companyId}/status`, { status: 'approved' }, '/admin');
   await settle();
   assert.strictEqual(sent.length, 1);
 });
 
-test('an approved company posting a demand alerts matching workers right away', async () => {
+test('each published demand alerts matching workers; the company name stays hidden unless shown', async () => {
   sent.length = 0;
   let { page } = await postDemand('Painter', 'Villa painter');
-  assert.match(page.text, /Demand posted\. 1 workers with this position were sent a message/);
+  assert.match(page.text, /Job published\. 1 workers with this position were sent a message/);
   await settle();
   assert.deepStrictEqual(recipients(), ['966550000001']);
+  assert.match(sent[0].text.body, /একটি ক্লায়েন্ট কোম্পানি/);
+  assert.doesNotMatch(sent[0].text.body, /Najd Power/);
 
   sent.length = 0;
   ({ page } = await postDemand('Plumber', 'Plumber for towers'));
@@ -117,12 +132,13 @@ test('worker changes positions and job alerts in the profile', async () => {
 });
 
 test('company and admin see the worker positions', async () => {
-  const id = workers.anis;
-  await id.post(`/demands/${(await postDemand('Mason', 'Mason job')).id}/apply`, new FormData(), '/worker');
-  const list = await company.get('/company');
-  const demandLink = /\/company\/demands\/(\d+)">\s*<b>Mason job/.exec(list.text) || /href="\/company\/demands\/(\d+)"><b><bdi>Mason job/.exec(list.text);
-  const apps = await company.get(`/company/demands/${demandLink[1]}`);
-  const appId = /\/company\/applications\/(\d+)"/.exec(apps.text)[1];
-  const view = await company.get('/company/applications/' + appId);
+  const { id } = await postDemand('Mason', 'Mason job');
+  await workers.anis.post(`/demands/${id}/apply`, new FormData(), '/worker');
+  const apps = await admin.get(`/admin/demands/${id}`);
+  const appId = /\/admin\/applications\/(\d+)"/.exec(apps.text)[1];
+  assert.match((await admin.get('/admin/applications/' + appId)).text, /Work positions<\/th><td>Mason, Electrician/);
+  await admin.post(`/admin/applications/${appId}/status`, { status: 'hired' }, '/admin');
+  const own = await company.get(`/company/demands/${id}`);
+  const view = await company.get('/company/assigned/' + /\/company\/assigned\/(\d+)"/.exec(own.text)[1]);
   assert.match(view.text, /Work positions<\/th><td>Mason, Electrician/);
 });

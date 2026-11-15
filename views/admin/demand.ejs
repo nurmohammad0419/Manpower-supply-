@@ -1,0 +1,145 @@
+<%- include('../partials/header') %>
+<% const opt = (name, v) => ['yes', 'allowance', 'no'].map(o => `<option value="${o}" ${v === o ? 'selected' : ''}>${escapeHtml(t({ yes: 'Provided by company', allowance: 'Allowance paid', no: 'Not provided' }[o]))}</option>`).join('');
+   const sameType = form.salary_type === form.worker_rate_type; %>
+<div class="crumbs"><a href="/admin/demands"><span class="arr">←</span> <%= t('Demands') %></a></div>
+<div class="section-head">
+  <div>
+    <h1><bdi><%= demand.title %></bdi></h1>
+    <p class="muted company-line"><%- include('../partials/logo', { file: demand.logo_file }) %><bdi><%= demand.company_name %></bdi> · <%= t(demand.category) %> · <%= t(demand.location_city) %><% if (demand.work_site) { %> — <bdi><%= demand.work_site %></bdi><% } %></p>
+  </div>
+  <div class="actions">
+    <%- include('../partials/review-badge', { status: demand.review_status }) %>
+    <% if (demand.review_status === 'published') { %><a class="btn btn-alt" href="/demands/<%= demand.id %>" target="_blank"><%= t('View public page') %></a><a class="btn btn-alt" href="/demands/<%= demand.id %>/letter" target="_blank"><%= t('Job offer') %></a><% } %>
+  </div>
+</div>
+<% if (demand.company_status !== 'approved') { %><div class="alert alert-warn"><%= t('Approve the company before publishing its demand.') %></div><% } %>
+
+<div class="card">
+  <h2><%= t('Company demand') %></h2>
+  <table class="kv">
+    <tr><th><%= t('Workers needed') %></th><td><%= demand.quantity %></td></tr>
+    <tr><th><%= t('Working hours') %></th><td><%= t('{h} hours/day, {d} days/week', { h: demand.hours_per_day, d: demand.days_per_week }) %></td></tr>
+    <tr><th><%= t('Overtime') %></th><td><bdi><%= demand.overtime || '—' %></bdi></td></tr>
+    <tr><th><%= t('Contract duration') %></th><td><bdi><%= demand.duration %></bdi></td></tr>
+    <tr><th><%= t('Start date') %></th><td><%= demand.start_date ? fmtDate(demand.start_date) : t('Immediate') %></td></tr>
+    <tr><th><%= t('Documents required') %></th><td><%= demand.required_docs.split(',').filter(Boolean).map(d => t(DOC_TYPES[d])).join(', ') || '—' %></td></tr>
+  </table>
+  <% if (demand.requirements) { %><p class="prewrap" dir="auto"><bdi><%= demand.requirements %></bdi></p><% } %>
+</div>
+
+<form method="post" action="/admin/demands/<%= demand.id %>/publish" enctype="multipart/form-data" id="publish-form">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <div class="split">
+    <div class="card client-only">
+      <h2><%= t('1. Agreement with the company') %></h2>
+      <p class="hint"><%= t('Confirm with the company what it pays, in how many days, and which facilities it gives. Workers do not see this.') %></p>
+      <div class="row2">
+        <label><%= t('Company rate (SAR)') %> * <input type="number" name="salary_amount" min="0" step="0.01" required value="<%= form.salary_amount %>"></label>
+        <label><%= t('Rate type') %>
+          <select name="salary_type"><% Object.entries(SALARY_TYPES).forEach(([k, v]) => { %><option value="<%= k %>" <%= form.salary_type === k ? 'selected' : '' %>><%= t(v) %></option><% }) %></select>
+        </label>
+      </div>
+      <label><%= t('Company pays within (days after month end)') %> * <input type="number" name="client_payment_days" min="0" max="365" required value="<%= form.client_payment_days %>"></label>
+      <div class="row3">
+        <label><%= t('Food') %><select name="food"><%- opt('food', form.food) %></select></label>
+        <label><%= t('Accommodation') %><select name="accommodation"><%- opt('accommodation', form.accommodation) %></select></label>
+        <label><%= t('Transport') %><select name="transport"><%- opt('transport', form.transport) %></select></label>
+      </div>
+      <label><%= t('Signed agreement (PDF or photo)') %> <input type="file" name="agreement" accept=".pdf,image/jpeg,image/png">
+        <% if (demand.agreement_file) { %><span class="hint"><a href="/agreements/<%= demand.id %>" target="_blank"><%= t('Open agreement') %></a> — <%= t('Leave empty to keep the file you uploaded before.') %></span><% } %>
+      </label>
+      <label class="check"><input type="checkbox" name="agreement_signed" value="1" <%= form.agreement_signed ? 'checked' : '' %>> <b><%= t('The agreement with the company is signed') %></b></label>
+    </div>
+
+    <div class="card worker-side">
+      <h2><%= t('2. Job post for workers') %></h2>
+      <p class="hint"><%= t('This is what workers see. Keep your margin for kafala and other costs.') %></p>
+      <div class="row2">
+        <label><%= t('Worker rate (SAR)') %> * <input type="number" name="worker_rate" id="worker-rate" min="0" step="0.01" required value="<%= form.worker_rate %>"></label>
+        <label><%= t('Rate type') %>
+          <select name="worker_rate_type" id="worker-type"><% Object.entries(SALARY_TYPES).forEach(([k, v]) => { %><option value="<%= k %>" <%= form.worker_rate_type === k ? 'selected' : '' %>><%= t(v) %></option><% }) %></select>
+        </label>
+      </div>
+      <div class="margin-box" id="margin" data-client="<%= form.salary_amount %>" data-client-type="<%= form.salary_type %>"
+        data-label="<%= t('Your margin') %>" data-other="<%= t('Rate types differ — compare the monthly totals yourself.') %>"></div>
+      <label><%= t('Worker salary paid within (days after month end)') %> * <input type="number" name="worker_pay_days" min="0" max="90" required value="<%= form.worker_pay_days %>"></label>
+      <div class="label"><%= t('Facilities for workers') %></div>
+      <label class="check"><input type="checkbox" name="local_transport" value="1" <%= form.local_transport ? 'checked' : '' %>> <%= t('Workers living in {city}: transport to work provided by ManpowerHub KSA', { city: t(demand.location_city) }) %></label>
+      <label class="check"><input type="checkbox" name="outside_accommodation" value="1" <%= form.outside_accommodation ? 'checked' : '' %>> <%= t('Workers from other cities: accommodation provided') %></label>
+      <label class="check"><input type="checkbox" name="outside_food" value="1" <%= form.outside_food ? 'checked' : '' %>> <%= t('Workers from other cities: food provided') %></label>
+      <label><%= t('Terms and conditions for workers') %>
+        <textarea name="worker_terms" rows="4" maxlength="3000" placeholder="<%= t('e.g. Probation 1 month. Overtime paid at the same hourly rate. Iqama must stay valid.') %>"><%= form.worker_terms || '' %></textarea>
+      </label>
+      <label class="check"><input type="checkbox" name="show_company" value="1" <%= form.show_company ? 'checked' : '' %>> <%= t('Show the company name to workers') %></label>
+      <label><%= t('Note (optional)') %> <input name="admin_note" maxlength="1000" value="<%= demand.review_status === 'published' ? (form.admin_note || '') : '' %>"></label>
+      <button class="btn full"><%= demand.review_status === 'published' ? t('Save job post') : t('Publish job for workers') %></button>
+    </div>
+  </div>
+</form>
+
+<% if (demand.review_status !== 'published') { %>
+<form method="post" action="/admin/demands/<%= demand.id %>/reject" class="card medium">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <h2><%= t('Send back to the company') %></h2>
+  <label><%= t('What needs to change?') %> <textarea name="admin_note" rows="2" maxlength="1000" required></textarea></label>
+  <button class="btn btn-danger"><%= t('Send back for correction') %></button>
+</form>
+<% } %>
+
+<h2><%= t('Applicants') %></h2>
+<div class="stats stats-row">
+  <div class="stat"><b><%= counts.hired || 0 %> / <%= demand.quantity %></b><span><%= t('Hired') %></span></div>
+  <div class="stat"><b><%= counts.shortlisted || 0 %></b><span><%= t('Shortlisted') %></span></div>
+  <div class="stat"><b><%= counts.applied || 0 %></b><span><%= t('New') %></span></div>
+  <div class="stat"><b><%= counts.rejected || 0 %></b><span><%= t('Rejected') %></span></div>
+</div>
+<div class="tabs">
+  <a href="?" class="<%= !filter ? 'active' : '' %>"><%= t('All') %></a>
+  <% ['applied','shortlisted','hired','rejected'].forEach(s => { %><a href="?status=<%= s %>" class="<%= filter === s ? 'active' : '' %>"><%= t(APP_STATUS[s]) %></a><% }) %>
+</div>
+<% if (!applications.length) { %>
+  <div class="card empty"><%= t('No applicants here yet.') %></div>
+<% } else { %>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Worker') %></th><th><%= t('Profession') %></th><th><%= t('Contact') %></th><th><%= t('Applied') %></th><th><%= t('Status') %></th><th><%= t('Action') %></th></tr></thead>
+    <tbody>
+    <% applications.forEach(a => { %>
+      <tr>
+        <td><a href="/admin/applications/<%= a.id %>"><b><bdi><%= a.full_name %></bdi></b></a><div class="small muted"><%= t(a.nationality) %><%= a.city ? ' · ' + t(a.city) : '' %></div></td>
+        <td><%= t(a.profession) %><div class="small muted"><%= t('{n} yrs exp.', { n: a.experience_years }) %></div></td>
+        <td class="small" dir="ltr"><%= a.phone %><br><%= a.email %></td>
+        <td class="small"><%= fmtDate(a.created_at) %></td>
+        <td><span class="badge badge-<%= a.status %>"><%= t(APP_STATUS[a.status]) %></span></td>
+        <td class="nowrap">
+          <a href="/admin/applications/<%= a.id %>"><%= t('Documents') %></a>
+          <% if (a.status !== 'withdrawn') { %>
+          <form method="post" action="/admin/applications/<%= a.id %>/status" class="inline quick">
+            <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="back" value="list">
+            <% if (a.status === 'applied') { %><button name="status" value="shortlisted" class="btn btn-sm btn-alt"><%= t('Shortlist') %></button><% } %>
+            <% if (a.status !== 'hired') { %><button name="status" value="hired" class="btn btn-sm"><%= t('Hire') %></button><% } %>
+            <% if (a.status !== 'rejected' && a.status !== 'hired') { %><button name="status" value="rejected" class="btn btn-sm btn-danger"><%= t('Reject') %></button><% } %>
+          </form>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+<script>
+  (function () {
+    var box = document.getElementById('margin'), rate = document.getElementById('worker-rate'), type = document.getElementById('worker-type');
+    var client = document.querySelector('[name=salary_amount]'), clientType = document.querySelector('[name=salary_type]');
+    function update() {
+      var c = parseFloat(client.value) || 0, w = parseFloat(rate.value) || 0;
+      if (clientType.value !== type.value) { box.textContent = box.dataset.other; return; }
+      var m = c - w, pct = c ? Math.round(m / c * 100) : 0;
+      box.textContent = box.dataset.label + ': ' + m.toFixed(2) + ' SAR (' + pct + '%)';
+    }
+    [rate, type, client, clientType].forEach(function (el) { el.addEventListener('input', update); });
+    update();
+  })();
+</script>
+<%- include('../partials/footer') %>

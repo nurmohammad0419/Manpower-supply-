@@ -4,42 +4,57 @@
 
 Companies in Saudi Arabia post manpower demands online, workers browse them and apply with their documents, and companies review and hire — fully digital.
 
+## How it works (supply-company model)
+
+ManpowerHub KSA (the admin) is the supply company between client companies and workers. Under Saudi rules a
+worker cannot simply sign directly with any company (kafala and other costs), so workers are employed and paid
+by the supply company, and every company demand is covered by a signed agreement before workers see it.
+
+1. **Company posts a demand** with its own terms: the rate it pays per worker (hourly / daily / monthly), how many
+   days after month end it pays, hours, duration, location and the facilities it offers. Workers cannot see it yet.
+2. **Admin checks it and signs the agreement**: confirms the company rate, payment days and facilities, uploads the
+   signed agreement (PDF or photo) and ticks "agreement signed". A demand cannot be published without that, and the
+   company must be approved. The admin can also send it back to the company with a note.
+3. **Admin publishes the job for workers** with the worker rate (the page shows the margin), salary payment days and
+   terms: transport provided by ManpowerHub KSA for workers living in the job's city, accommodation and food for
+   workers from other cities, plus free-text terms and conditions. The company name is hidden unless the admin
+   chooses to show it. Publishing sends job alerts to workers with that position.
+4. **Workers apply to ManpowerHub KSA.** The admin shortlists and hires. The company only sees the workers assigned
+   to it (profile, Iqama, documents) — never their phone number or e-mail — and cannot change a published demand.
+5. **Timesheets:** the company submits hours each month (amount owed from its rate). The admin sets each worker's pay
+   from the worker rate and the payment method, confirms, and workers are told their hours, pay and status. The
+   company's payment due date is calculated from the agreed days; the admin records when the company pays.
+6. **Payments:** the admin pays the workers, marks them paid (with optional receipt) and workers get a message and a
+   printable payment slip issued by ManpowerHub KSA.
+
 ## Features
 
 **Company (কোম্পানি)**
-- Register once: company name, CR number, contact person, city, and an optional company logo (shown on its demands and demand letters)
-- Post demands: category, number of workers, rate in SAR (hourly / daily / monthly), hours per day, days per week, overtime, duration, city and site, food / accommodation / transport, start date, last date to apply, required documents
-- Auto-generated printable **demand letter** for each demand (print or save as PDF)
-- Applicant list per demand with filters (New / Shortlisted / Hired / Rejected)
-- View each applicant's profile and documents, then Shortlist / Hire / Reject, with a note to the worker
-- Tracks hired vs. needed (cannot hire more than the demand quantity); close or re-open a demand
+- Register once: company name, CR number, contact person, city, and an optional company logo
+- Post demands with its terms; see the review status, admin notes, the signed agreement and the assigned workers
+- Submit monthly timesheets (PDF, Excel or CSV) and see the amount owed and the payment due date
 
 **Worker (কর্মী)**
 - Register: name, nationality, Iqama number, passport number, main profession plus any other positions they can work in, experience, skills
-- Optional extra details in the profile: Iqama and passport expiry, sponsorship (kafala) transfer, Saudi driving license, languages, expected salary, available-from date, work history — companies see these when the worker applies
+- Optional extra details in the profile: Iqama and passport expiry, sponsorship (kafala) transfer, Saudi driving license, languages, expected salary, available-from date, work history, bank name and IBAN
 - Upload documents once (Iqama, Passport, Photo, CV, license, medical, certificates) and reuse them for every application
-- Browse and search demands by keyword, category and city
-- Apply; any missing required document can be uploaded on the apply form
-- Dashboard with application status (Applied → Shortlisted → Hired), company notes, withdraw option and recommended jobs
+- Browse and search jobs by keyword, category and city; see the worker rate and terms, with the terms for their own city highlighted
+- Dashboard with application status (Applied → Shortlisted → Hired), notes, withdraw option and recommended jobs
+- Payments page with payment slips and receipts
 
-**Admin**
-- Verify (approve / reject) companies. Demands become public only after the company is approved.
-- Overview of companies, demands, workers and their documents
-- **Worker profile fields**: add any extra question for workers (text, number, date, yes/no or a choice list; optional or required). It appears in the worker registration form and profile, and companies see the answers. Fields can be hidden or deleted later.
+**Admin (ManpowerHub KSA)**
+- Verify (approve / reject) companies
+- Review demands, sign agreements, publish job posts with the worker rate and terms, see the margin
+- Handle applications: shortlist, hire (assign to the company), reject — with notes to the worker
+- Check timesheets, set worker pay, pay workers, record company payments
+- **Worker profile fields**: add any extra question for workers (text, number, date, yes/no or a choice list; optional or required)
 - Log of every WhatsApp / SMS message and whether it was sent
 
-**Timesheets & payments (হাজিরা ও পেমেন্ট)**
-1. At month end the company uploads the timesheet file (PDF, Excel `.xlsx`/`.xls` or CSV) for a demand and enters, for each hired worker, days worked, hours and the amount in SAR (calculated from the rate, editable), plus the payment method: bank transfer or cash.
-2. The admin opens the file, compares it with the numbers and either confirms it or sends it back with a note. The company corrects and resubmits (the file can be kept or replaced).
-3. On confirmation each worker gets a WhatsApp / SMS: month, days, hours, amount, payment method and payment status. The company is told too.
-4. When the worker is paid, the company (or admin) marks it paid with the date, an optional reference and an optional receipt. The worker gets another message.
-5. Workers see all their months on the **Payments** page and can print a **payment slip** (with IBAN for bank payments) and open the receipt. Other workers and other companies cannot see them.
-
 **WhatsApp / SMS notifications**
-- Worker: when shortlisted, hired (with the company's note) or not selected
-- Worker: **new job alerts** — when a company posts a demand, every worker with that position (main or extra) gets a message with the job, company, city, pay and a link. Demands from a company that is not approved yet are announced when the admin approves it; each demand is announced once. Workers can switch job alerts off in their profile.
-- Company: when a worker applies, when the admin approves the company, and when a timesheet is confirmed or sent back
-- Worker: when a timesheet is confirmed (hours, amount, payment status) and when the payment is made
+- Worker: when shortlisted, hired (with the admin's note) or not selected
+- Worker: **new job alerts** — when the admin publishes a job, every worker with that position (main or extra) gets a message with the job, city, worker pay and a link (the company name only if the admin shows it). Each job is announced once. Workers can switch job alerts off in their profile.
+- Company: when the admin approves the company, publishes or sends back a demand, assigns a worker, and confirms or sends back a timesheet
+- Worker: when a timesheet is confirmed (hours, pay, payment status) and when the payment is made
 - Messages are written in each person's chosen language. Everyone can choose WhatsApp, SMS or no messages in their profile.
 
 **Languages (ভাষা)**
@@ -51,7 +66,7 @@ Companies in Saudi Arabia post manpower demands online, workers browse them and 
 - Passwords hashed with scrypt; sessions stored server-side in an HttpOnly cookie
 - CSRF protection on every form
 - Uploaded files are checked by their real content (PDF / JPG / PNG / WEBP only, max 5 MB) and stored with random names
-- A worker's documents are visible only to the worker, the admin, and companies the worker has applied to
+- A worker's documents are visible only to the worker, the admin, and the company the admin assigned the worker to. Companies never see workers' phone numbers, e-mails, bank details or pay
 
 ## Run it
 
@@ -108,6 +123,7 @@ src/i18n.js          language list and translation lookup
 src/notify.js        WhatsApp / SMS messages (Meta, Twilio)
 src/timesheets.js    monthly timesheets, admin check, payments, payment slips
 src/jobAlerts.js     worker positions and new-job alerts
+src/demands.js       company demands, admin review / agreement / publishing, applications
 src/locales/*.json   translations (English text → translated text)
 src/lib/web.js       small built-in web framework (routing, sessions, uploads)
 src/lib/template.js  EJS-style templates

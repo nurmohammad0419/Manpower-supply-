@@ -228,3 +228,16 @@ p.hint { margin: 4px 0 8px; }
 .stat-link { color: var(--text); }
 .stat-link:hover { border-color: var(--primary); text-decoration: none; }
 .letter-table tr.total th, .letter-table tr.total td { background: #e3f2ec; font-size: 1.05rem; }
+
+/* Supply-company model */
+.logo.lg-logo { width: 56px; height: 56px; font-size: 1.2rem; border-radius: 10px; flex: none; }
+tr.applies th, tr.applies td { background: var(--primary-soft); }
+.letter-table tr.applies th, .letter-table tr.applies td { background: #e3f2ec; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .split { grid-template-columns: 1fr; } }
+.margin-box { border: 1px dashed var(--accent); border-radius: 10px; padding: 10px 12px; background: var(--warn-soft); margin: 10px 0; font-size: .92rem; }
+.client-only { border-inline-start: 4px solid var(--accent); }
+.worker-side { border-inline-start: 4px solid var(--primary); }
+.assigned { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.assigned:last-child { border-bottom: 0; }
+.pay-input { width: 110px; margin: 0; }

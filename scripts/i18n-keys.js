@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES, KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
-  TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS,
+  TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REVIEW_STATUS,
 } = require('../src/constants');
 
 const root = path.join(__dirname, '..');
@@ -24,9 +24,10 @@ function collectKeys() {
     for (const m of src.matchAll(/\['\w+', '([^']+)'\]/g)) add(m[1]);
     for (const m of src.matchAll(/\bt\([^()]*?\? '([^']+)' : '([^']+)'\)/g)) { add(m[1]); add(m[2]); }
     for (const m of src.matchAll(/\b(?:sent|failed|not_sent|pending): '([^']+)'/g)) add(m[1]);
+    for (const m of src.matchAll(/(?:\?|:) '([A-Z][^']+)'/g)) add(m[1]); // texts chosen with a ? : in templates
   }
 
-  const server = ['src/server.js', 'src/timesheets.js', 'src/jobAlerts.js'].map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+  const server = ['src/server.js', 'src/timesheets.js', 'src/jobAlerts.js', 'src/demands.js'].map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
   const patterns = [
     /flash\(req, [^,]+, '([^']+)'/g,
     /\b(?:title|message|error): '([^']+)'/g,
@@ -41,6 +42,7 @@ function collectKeys() {
     /fail\('([^']+)'\)/g,
     /notFound\(res, '([^']+)'\)/g,
     /message = '([^']+)'\)/g,
+    /\{ tr: '([^']+)' \}/g,
   ];
   for (const re of patterns) for (const m of server.matchAll(re)) add(m[1]);
   // Titles of pages rendered with a variable title are user content and not translated.
@@ -56,7 +58,7 @@ function collectKeys() {
 
   [CATEGORIES, Object.values(DOC_TYPES), CITIES, Object.values(SALARY_TYPES), Object.values(APP_STATUS), NATIONALITIES,
     Object.values(KAFALA_OPTIONS), Object.values(DRIVING_OPTIONS), Object.values(NOTIFY_CHANNELS), Object.values(FIELD_TYPES),
-    Object.values(TIMESHEET_STATUS), Object.values(PAYMENT_METHODS), Object.values(PAYMENT_STATUS)]
+    Object.values(TIMESHEET_STATUS), Object.values(PAYMENT_METHODS), Object.values(PAYMENT_STATUS), Object.values(REVIEW_STATUS)]
     .forEach((list) => list.forEach(add));
   ['Open', 'Closed'].forEach(add);
   return [...keys].filter((k) => !/^\/|^[a-z_]+$/.test(k)).sort();

@@ -1,5 +1,6 @@
 <%- include('partials/header') %>
-<% const isAdmin = user.role === 'admin'; %>
+<% const isAdmin = user.role === 'admin'; const reviewing = isAdmin && ts.status === 'submitted';
+   const suggest = (l) => { if (!ts.worker_rate) return ''; const v = ts.worker_rate_type === 'hourly' ? l.hours * ts.worker_rate : ts.worker_rate_type === 'daily' ? l.days_worked * ts.worker_rate : Math.min(l.days_worked, 30) / 30 * ts.worker_rate; return v.toFixed(2); }; %>
 <div class="crumbs"><a href="<%= back %>"><span class="arr">←</span> <%= t('Timesheets') %></a></div>
 <div class="section-head">
   <div>
@@ -20,57 +21,84 @@
 <div class="stats stats-row">
   <div class="stat"><b><%= lines.length %></b><span><%= t('Workers') %></span></div>
   <div class="stat"><b><%= ts.total_hours %></b><span><%= t('Hours') %></span></div>
-  <div class="stat"><b><%= money(ts.total_amount) %></b><span><%= t('Amount (SAR)') %></span></div>
-  <div class="stat"><b><%= t(PAYMENT_METHODS[ts.payment_method]) %></b><span><%= t('Payment method') %></span></div>
+  <div class="stat"><b><%= money(ts.total_amount) %></b><span><%= isAdmin ? t('Company owes (SAR)') : t('Amount you owe (SAR)') %></span></div>
+  <% if (ts.status === 'confirmed') { %>
+    <div class="stat"><b><%= fmtDate(ts.client_due_date) %></b><span><%= ts.client_paid_at ? t('Company paid on {date}', { date: fmtDate(ts.client_paid_at) }) : t('Payment due date') %></span></div>
+    <% if (isAdmin) { %>
+      <div class="stat"><b><%= money(ts.total_worker) %></b><span><%= t('Worker pay (SAR)') %></span></div>
+      <div class="stat"><b><%= money(ts.total_amount - ts.total_worker) %></b><span><%= t('Your margin (SAR)') %></span></div>
+    <% } %>
+  <% } %>
 </div>
 
+<% if (isAdmin && ts.status === 'confirmed' && !ts.client_paid_at) { %>
+  <form method="post" action="/admin/timesheets/<%= ts.id %>/client-paid" class="card inline-form">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label><%= t('Company payment received on') %> <input type="date" name="paid_at" value="<%= new Date().toISOString().slice(0, 10) %>"></label>
+    <button class="btn"><%= t('Record company payment') %></button>
+  </form>
+<% } %>
+
+<% if (reviewing) { %><form method="post" action="/admin/timesheets/<%= ts.id %>/review" id="review-form"><input type="hidden" name="_csrf" value="<%= csrf %>"></form><% } %>
 <div class="card table-wrap">
   <table class="table">
-    <thead><tr><th><%= t('Worker') %></th><th><%= t('Days worked') %></th><th><%= t('Hours') %></th><th><%= t('Amount (SAR)') %></th><th><%= t('Payment') %></th></tr></thead>
+    <thead><tr>
+      <th><%= t('Worker') %></th><th><%= t('Days worked') %></th><th><%= t('Hours') %></th>
+      <th><%= isAdmin ? t('Company amount (SAR)') : t('Amount you owe (SAR)') %></th>
+      <% if (isAdmin) { %><th><%= t('Worker pay (SAR)') %></th><th><%= t('Payment') %></th><% } %>
+    </tr></thead>
     <tbody>
     <% lines.forEach(l => { %>
       <tr>
         <td><b><bdi><%= l.full_name %></bdi></b><div class="small muted"><%= t('Iqama No.') %> <%= l.iqama_number || '—' %></div>
-          <% if (ts.payment_method === 'bank') { %><div class="small muted" dir="ltr"><%= l.bank_name || '' %> <%= l.iban || '' %></div><% } %></td>
+          <% if (isAdmin && (l.bank_name || l.iban)) { %><div class="small muted" dir="ltr"><%= l.bank_name || '' %> <%= l.iban || '' %></div><% } %></td>
         <td><%= l.days_worked %></td>
         <td><%= l.hours %></td>
-        <td class="nowrap"><b><%= money(l.amount) %></b></td>
-        <td>
-          <%- include('partials/pay-badge', { status: l.payment_status }) %>
-          <% if (l.payment_status === 'paid') { %>
-            <div class="small muted"><%= fmtDate(l.paid_at) %><%= l.payment_ref ? ' · ' : '' %><bdi><%= l.payment_ref %></bdi></div>
-            <div class="small"><a href="/payslips/<%= l.id %>" target="_blank"><%= t('Payment slip') %></a><% if (l.proof_file) { %> · <a href="/timesheet-lines/<%= l.id %>/proof" target="_blank"><%= t('Receipt') %></a><% } %></div>
-          <% } else if (ts.status === 'confirmed') { %>
-            <details class="pay-form">
-              <summary class="btn btn-sm"><%= t('Mark as paid') %></summary>
-              <form method="post" action="/timesheet-lines/<%= l.id %>/paid" enctype="multipart/form-data">
-                <input type="hidden" name="_csrf" value="<%= csrf %>">
-                <label><%= t('Payment date') %> <input type="date" name="paid_at" value="<%= new Date().toISOString().slice(0, 10) %>"></label>
-                <label><%= t('Reference (optional)') %> <input name="payment_ref" maxlength="100" placeholder="<%= t('e.g. bank transfer number') %>"></label>
-                <label><%= t('Receipt (optional)') %> <input type="file" name="proof" accept=".pdf,image/*"></label>
-                <button class="btn btn-sm"><%= t('Save payment') %></button>
-              </form>
-            </details>
-          <% } %>
-        </td>
+        <td class="nowrap"><%= money(l.amount) %></td>
+        <% if (isAdmin) { %>
+          <td class="nowrap">
+            <% if (reviewing) { %><input type="number" form="review-form" name="pay_<%= l.id %>" min="0" step="0.01" value="<%= suggest(l) %>" class="pay-input"><% } else if (ts.status === 'confirmed') { %><b><%= money(l.pay) %></b><% } else { %>—<% } %>
+          </td>
+          <td>
+            <% if (ts.status !== 'confirmed') { %>—<% } else { %>
+            <%- include('partials/pay-badge', { status: l.payment_status }) %>
+            <% if (l.payment_status === 'paid') { %>
+              <div class="small muted"><%= fmtDate(l.paid_at) %><%= l.payment_ref ? ' · ' : '' %><bdi><%= l.payment_ref %></bdi></div>
+              <div class="small"><a href="/payslips/<%= l.id %>" target="_blank"><%= t('Payment slip') %></a><% if (l.proof_file) { %> · <a href="/timesheet-lines/<%= l.id %>/proof" target="_blank"><%= t('Receipt') %></a><% } %></div>
+            <% } else { %>
+              <details class="pay-form">
+                <summary class="btn btn-sm"><%= t('Mark as paid') %></summary>
+                <form method="post" action="/timesheet-lines/<%= l.id %>/paid" enctype="multipart/form-data">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <label><%= t('Payment date') %> <input type="date" name="paid_at" value="<%= new Date().toISOString().slice(0, 10) %>"></label>
+                  <label><%= t('Reference (optional)') %> <input name="payment_ref" maxlength="100" placeholder="<%= t('e.g. bank transfer number') %>"></label>
+                  <label><%= t('Receipt (optional)') %> <input type="file" name="proof" accept=".pdf,image/*"></label>
+                  <button class="btn btn-sm"><%= t('Save payment') %></button>
+                </form>
+              </details>
+            <% } } %>
+          </td>
+        <% } %>
       </tr>
     <% }) %>
     </tbody>
   </table>
 </div>
 
-<% if (isAdmin && ts.status === 'submitted') { %>
+<% if (reviewing) { %>
 <div class="card medium review-box">
   <h2><%= t('Check and confirm') %></h2>
-  <p class="muted"><%= t('Open the uploaded file and compare it with the hours and amounts above. When you confirm, every worker gets a message with their hours, amount and payment status.') %></p>
-  <form method="post" action="/admin/timesheets/<%= ts.id %>/review">
-    <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <label><%= t('Note (required when sending back)') %> <textarea name="admin_note" rows="2" maxlength="1000"></textarea></label>
-    <div class="actions">
-      <button class="btn" name="action" value="confirm"><%= t('Confirm and inform workers') %></button>
-      <button class="btn btn-danger" name="action" value="reject"><%= t('Send back for correction') %></button>
-    </div>
-  </form>
+  <p class="muted"><%= t('Open the uploaded file and compare it with the hours and amounts above. Set the pay of each worker (calculated from the worker rate: {rate} SAR {per}). When you confirm, every worker gets a message with their hours, pay and payment status.', { rate: ts.worker_rate ?? '—', per: t(SALARY_TYPES[ts.worker_rate_type] || '') }) %></p>
+  <label><%= t('Payment method for workers') %>
+    <select name="payment_method" form="review-form">
+      <% Object.entries(PAYMENT_METHODS).forEach(([k, v]) => { %><option value="<%= k %>"><%= t(v) %></option><% }) %>
+    </select>
+  </label>
+  <label><%= t('Note (required when sending back)') %> <textarea name="admin_note" form="review-form" rows="2" maxlength="1000"></textarea></label>
+  <div class="actions">
+    <button class="btn" name="action" value="confirm" form="review-form"><%= t('Confirm and inform workers') %></button>
+    <button class="btn btn-danger" name="action" value="reject" form="review-form"><%= t('Send back for correction') %></button>
+  </div>
 </div>
 <% } %>
 <%- include('partials/footer') %>

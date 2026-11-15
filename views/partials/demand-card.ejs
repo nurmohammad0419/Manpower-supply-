@@ -4,16 +4,16 @@
     <span class="muted small"><%= t(d.location_city) %></span>
   </div>
   <h3><bdi><%= d.title %></bdi></h3>
-  <div class="muted small company-line"><%- include('logo', { file: d.logo_file, size: 'sm' }) %><bdi><%= d.company_name %></bdi></div>
-  <div class="rate"><strong><%= d.salary_amount %> <%= t('SAR') %></strong> <%= t(SALARY_TYPES[d.salary_type]) %></div>
+  <div class="muted small company-line"><% if (d.show_company) { %><%- include('logo', { file: d.logo_file, size: 'sm' }) %><bdi><%= d.company_name %></bdi><% } else { %><%= t('Client company') %> · ManpowerHub KSA<% } %></div>
+  <div class="rate"><strong><%= d.worker_rate ?? '—' %> <%= t('SAR') %></strong> <%= t(SALARY_TYPES[d.worker_rate_type] || '') %></div>
   <div class="dc-meta">
     <span><%= t('{n} workers', { n: d.quantity }) %></span>
     <span><%= t('{n} hrs/day', { n: d.hours_per_day }) %></span>
     <span><bdi><%= d.duration %></bdi></span>
   </div>
   <div class="dc-perks">
-    <% if (d.food !== 'no') { %><span class="perk"><%= t('Food') %></span><% } %>
-    <% if (d.accommodation !== 'no') { %><span class="perk"><%= t('Accommodation') %></span><% } %>
-    <% if (d.transport !== 'no') { %><span class="perk"><%= t('Transport') %></span><% } %>
+    <% if (d.local_transport) { %><span class="perk"><%= t('Transport') %></span><% } %>
+    <% if (d.outside_accommodation) { %><span class="perk"><%= t('Accommodation') %></span><% } %>
+    <% if (d.outside_food) { %><span class="perk"><%= t('Food') %></span><% } %>
   </div>
 </a>

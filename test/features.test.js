@@ -81,12 +81,15 @@ test('admin approval sends the company a WhatsApp message', async () => {
   assert.match(body.text.body, /https:\/\/jobs\.example\.com\/company/);
 });
 
-test('company posts a demand that shows its logo', async () => {
+test('a published demand shows the company logo when the admin shows the company name', async () => {
   const r = await company.post('/company/demands', {
-    title: 'Mason for school project', category: 'Mason', quantity: '2', salary_amount: '12', salary_type: 'hourly',
+    title: 'Mason for school project', category: 'Mason', quantity: '2', salary_amount: '12', salary_type: 'hourly', client_payment_days: '30',
     hours_per_day: '10', days_per_week: '6', duration: '4 months', location_city: 'Riyadh', required_docs: 'iqama',
   }, '/company');
   demandId = r.location.split('/').pop();
+  await ctx.publish(admin, demandId, { show_company: '1', worker_rate: '10' });
+  await waitForMessages(2); // company: "your demand is published"
+  assert.match(JSON.parse(sent[1].body).text.body, /Your demand "Mason for school project" is confirmed and published/);
   const list = await new Client().get('/demands');
   assert.ok(list.text.includes('/logos/' + logoFile));
 });
@@ -114,7 +117,7 @@ test('admin adds extra worker fields; required ones are enforced at registration
   assert.strictEqual(r.location, '/worker/documents');
 });
 
-test('worker adds more details; the company sees them after the worker applies', async () => {
+test('worker adds more details; the admin sees them, the company only after the worker is assigned', async () => {
   const page = await worker.get('/worker/profile');
   const ids = [...page.text.matchAll(/name="cf_(\d+)"/g)].map((m) => m[1]);
   const r = await worker.post('/worker/profile', {
@@ -133,21 +136,21 @@ test('worker adds more details; the company sees them after the worker applies',
   const fd = new FormData();
   fd.append('doc_iqama', new Blob([PDF]), 'iqama.pdf');
   await worker.post(`/demands/${demandId}/apply`, fd, `/demands/${demandId}`);
-  await waitForMessages(2); // company is told about the new application
-  assert.match(JSON.parse(sent[1].body).text.body, /New application from Rafiq Islam for "Mason for school project"/);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.strictEqual(sent.length, 2, 'applications go to the admin, the company is not messaged');
 
-  const list = await company.get(`/company/demands/${demandId}`);
-  const appId = /\/company\/applications\/(\d+)"/.exec(list.text)[1];
-  const view = await company.get('/company/applications/' + appId);
+  const list = await admin.get(`/admin/demands/${demandId}`);
+  const appId = /\/admin\/applications\/(\d+)"/.exec(list.text)[1];
+  const view = await admin.get('/admin/applications/' + appId);
   for (const s of ['Transferable', 'Light vehicle', 'Bangla, Arabic', '1800 per month', '2020-2024 Mason, Jeddah', 'Married', '172']) {
-    assert.ok(view.text.includes(s), 'company sees ' + s);
+    assert.ok(view.text.includes(s), 'admin sees ' + s);
   }
   worker.appId = appId;
 });
 
-test('hiring sends the worker an SMS in their language, with the company note', async () => {
-  await company.post(`/company/applications/${worker.appId}/status`, { status: 'hired', company_note: 'Come Sunday 7 AM' }, '/company');
-  await waitForMessages(3);
+test('hiring sends the worker an SMS in their language, with the note; the company is told who was assigned', async () => {
+  await admin.post(`/admin/applications/${worker.appId}/status`, { status: 'hired', company_note: 'Come Sunday 7 AM' }, '/admin');
+  await waitForMessages(4);
   const m = sent[2];
   assert.strictEqual(m.url, 'https://api.twilio.com/2010-04-01/Accounts/AC_TEST/Messages.json');
   assert.strictEqual(m.headers.Authorization, 'Basic ' + Buffer.from('AC_TEST:secret').toString('base64'));
@@ -156,22 +159,27 @@ test('hiring sends the worker an SMS in their language, with the company note', 
   assert.strictEqual(form.get('From'), '+15550000000');
   assert.match(form.get('Body'), /অভিনন্দন! Desert Builders আপনাকে "Mason for school project" কাজে নিয়োগ দিয়েছে/);
   assert.match(form.get('Body'), /কোম্পানির নোট: Come Sunday 7 AM/);
+  assert.match(JSON.parse(sent[3].body).text.body, /Rafiq Islam has been assigned to your demand "Mason for school project"/);
+  const own = await company.get(`/company/demands/${demandId}`);
+  const view = await company.get('/company/assigned/' + /\/company\/assigned\/(\d+)"/.exec(own.text)[1]);
+  for (const s of ['Transferable', 'Bangla, Arabic', 'Married']) assert.ok(view.text.includes(s), 'company sees ' + s);
+  assert.ok(!view.text.includes('0551112222'), 'company does not see the phone number');
 });
 
 test('failed and switched-off messages are recorded; admin can see them', async () => {
   failNext = true;
-  await company.post(`/company/applications/${worker.appId}/status`, { status: 'shortlisted' }, '/company');
-  await waitForMessages(4);
+  await admin.post(`/admin/applications/${worker.appId}/status`, { status: 'shortlisted' }, '/admin');
+  await waitForMessages(5);
   await new Promise((r) => setTimeout(r, 50));
   // Worker turns messages off: nothing more is sent.
   await worker.post('/worker/profile', { full_name: 'Rafiq Islam', nationality: 'Bangladesh', profession: 'Mason', phone: '0551112222', notify_channel: 'none', cf_1: 'Married' }, '/worker/profile');
-  await company.post(`/company/applications/${worker.appId}/status`, { status: 'rejected' }, '/company');
+  await admin.post(`/admin/applications/${worker.appId}/status`, { status: 'rejected' }, '/admin');
   await new Promise((r) => setTimeout(r, 100));
-  assert.strictEqual(sent.length, 4);
+  assert.strictEqual(sent.length, 5);
 
   const rows = db.prepare('SELECT status, error FROM notifications ORDER BY id').all();
-  assert.deepStrictEqual(rows.map((x) => x.status), ['sent', 'sent', 'sent', 'failed']);
-  assert.match(rows[3].error, /HTTP 400/);
+  assert.deepStrictEqual(rows.map((x) => x.status), ['sent', 'sent', 'sent', 'sent', 'failed']);
+  assert.match(rows[4].error, /HTTP 400/);
   const r = await admin.get('/admin');
   assert.match(r.text, /WhatsApp \/ SMS messages/);
   assert.match(r.text, /badge-rejected">Failed/);

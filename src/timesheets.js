@@ -1,16 +1,35 @@
-// Monthly timesheets and payments.
+// Monthly timesheets and payments (supply-company model).
 //
-// 1. A company uploads a timesheet file (PDF / Excel / CSV) for one demand and month, and enters
-//    days, hours and amount for each worker it hired on that demand.
-// 2. The admin checks it and confirms it, or sends it back for correction.
-// 3. On confirmation every worker is told (WhatsApp / SMS) their hours, amount, payment method and status.
-// 4. When the company (or admin) marks a worker as paid — optionally with a receipt — the worker is
-//    told again and can print a payment slip.
+// 1. A company uploads a timesheet file (PDF / Excel / CSV) for one demand and month, and enters days
+//    and hours for each worker assigned to it. The amount it owes is calculated from the company rate.
+// 2. The admin checks it, sets each worker's pay (from the worker rate) and the payment method, and
+//    confirms it — or sends it back for correction. The company's payment due date is set from the
+//    agreed payment days.
+// 3. On confirmation every worker is told (WhatsApp / SMS) their hours, pay, payment method and status.
+// 4. The admin (the supply company) pays the workers, marks them paid — optionally with a receipt —
+//    and the worker is told again and can print a payment slip. The admin also records when the
+//    company has paid.
 const fs = require('fs');
 const path = require('path');
 const web = require('./lib/web');
 const { TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS } = require('./constants');
 const { formatMoney } = require('./i18n');
+
+// Worker pay for a timesheet line from the worker rate.
+function defaultWorkerPay(line, rate, type) {
+  if (!rate) return 0;
+  if (type === 'hourly') return line.hours * rate;
+  if (type === 'daily') return line.days_worked * rate;
+  return Math.min(line.days_worked, 30) / 30 * rate;
+}
+
+// Last day of "YYYY-MM" plus n days, as YYYY-MM-DD.
+function dueDate(month, days) {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m, 0)); // last day of the month
+  d.setUTCDate(d.getUTCDate() + (Number(days) || 0));
+  return d.toISOString().slice(0, 10);
+}
 
 module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleUpload, checkCsrf, str, int, notifyUser, UPLOAD_DIR }) {
   const TS_DIR = path.join(UPLOAD_DIR, 'timesheets');
@@ -34,14 +53,16 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
     WHERE a.demand_id = ? AND a.status = 'hired' ORDER BY w.full_name`).all(demandId);
 
   const loadTimesheet = (id) => db.prepare(`
-    SELECT t.*, d.title AS demand_title, d.salary_amount, d.salary_type, c.company_name, c.logo_file,
+    SELECT t.*, d.title AS demand_title, d.salary_amount, d.salary_type, d.worker_rate, d.worker_rate_type,
+      d.client_payment_days, d.show_company, c.company_name, c.logo_file,
       (SELECT COALESCE(SUM(l.amount), 0) FROM timesheet_lines l WHERE l.timesheet_id = t.id) AS total_amount,
+      (SELECT COALESCE(SUM(COALESCE(l.worker_amount, 0)), 0) FROM timesheet_lines l WHERE l.timesheet_id = t.id) AS total_worker,
       (SELECT COALESCE(SUM(l.hours), 0) FROM timesheet_lines l WHERE l.timesheet_id = t.id) AS total_hours
     FROM timesheets t JOIN demands d ON d.id = t.demand_id JOIN companies c ON c.user_id = t.company_id
     WHERE t.id = ?`).get(id);
 
   const loadLines = (timesheetId) => db.prepare(`
-    SELECT l.*, w.full_name, w.iqama_number, w.bank_name, w.iban FROM timesheet_lines l JOIN workers w ON w.user_id = l.worker_id
+    SELECT l.*, COALESCE(l.worker_amount, l.amount) AS pay, w.full_name, w.iqama_number, w.bank_name, w.iban FROM timesheet_lines l JOIN workers w ON w.user_id = l.worker_id
     WHERE l.timesheet_id = ? ORDER BY w.full_name`).all(timesheetId);
 
   const listQuery = (where) => `
@@ -49,7 +70,8 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
       (SELECT COUNT(*) FROM timesheet_lines l WHERE l.timesheet_id = t.id) AS worker_count,
       (SELECT COUNT(*) FROM timesheet_lines l WHERE l.timesheet_id = t.id AND l.payment_status = 'paid') AS paid_count,
       (SELECT COALESCE(SUM(l.amount), 0) FROM timesheet_lines l WHERE l.timesheet_id = t.id) AS total_amount,
-      (SELECT COALESCE(SUM(l.hours), 0) FROM timesheet_lines l WHERE l.timesheet_id = t.id) AS total_hours
+      (SELECT COALESCE(SUM(l.hours), 0) FROM timesheet_lines l WHERE l.timesheet_id = t.id) AS total_hours,
+      (SELECT COALESCE(SUM(l.worker_amount), 0) FROM timesheet_lines l WHERE l.timesheet_id = t.id) AS total_worker
     FROM timesheets t JOIN demands d ON d.id = t.demand_id JOIN companies c ON c.user_id = t.company_id
     ${where} ORDER BY CASE t.status WHEN 'submitted' THEN 0 WHEN 'rejected' THEN 1 ELSE 2 END, t.month DESC, t.id DESC`;
 
@@ -81,7 +103,7 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
     const month = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month : thisMonth();
     // Editing a timesheet that is waiting for review or was sent back: start from its values.
     const existing = db.prepare('SELECT * FROM timesheets WHERE demand_id = ? AND month = ?').get(demand.id, month);
-    const form = { month, payment_method: existing?.payment_method || 'bank', existing };
+    const form = { month, existing };
     if (existing) {
       for (const l of loadLines(existing.id)) Object.assign(form, { ['days_' + l.worker_id]: l.days_worked, ['hours_' + l.worker_id]: l.hours, ['amount_' + l.worker_id]: l.amount });
     }
@@ -98,7 +120,6 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
     const month = str(b.month, 7);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return fail('Please choose the month.');
     if (month > thisMonth()) return fail('The month cannot be in the future.');
-    if (!PAYMENT_METHODS[b.payment_method]) return fail('Please choose the payment method.');
 
     const lines = [];
     for (const w of hiredWorkers(demand.id)) {
@@ -120,8 +141,8 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
       let id;
       if (existing) {
         id = existing.id;
-        db.prepare(`UPDATE timesheets SET payment_method = ?, status = 'submitted', admin_note = NULL, reviewed_at = NULL,
-          submitted_at = datetime('now') WHERE id = ?`).run(b.payment_method, id);
+        db.prepare(`UPDATE timesheets SET status = 'submitted', admin_note = NULL, reviewed_at = NULL,
+          submitted_at = datetime('now') WHERE id = ?`).run(id);
         if (file) {
           db.prepare('UPDATE timesheets SET file_name = ?, original_name = ?, mime_type = ? WHERE id = ?').run(file.filename, file.originalname, file.mimetype, id);
           removeFile(existing.file_name);
@@ -129,7 +150,7 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
         db.prepare('DELETE FROM timesheet_lines WHERE timesheet_id = ?').run(id);
       } else {
         id = db.prepare(`INSERT INTO timesheets (company_id, demand_id, month, file_name, original_name, mime_type, payment_method)
-          VALUES (?,?,?,?,?,?,?)`).run(req.session.user.id, demand.id, month, file.filename, file.originalname, file.mimetype, b.payment_method).lastInsertRowid;
+          VALUES (?,?,?,?,?,?,'bank')`).run(req.session.user.id, demand.id, month, file.filename, file.originalname, file.mimetype).lastInsertRowid;
       }
       const insert = db.prepare('INSERT INTO timesheet_lines (timesheet_id, worker_id, days_worked, hours, amount) VALUES (?,?,?,?,?)');
       for (const l of lines) insert.run(id, l.worker_id, l.days, l.hours, l.amount);
@@ -173,11 +194,30 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
       flash(req, 'success', 'Timesheet sent back to the company for correction.');
       return res.redirect(back);
     }
-    db.prepare("UPDATE timesheets SET status = 'confirmed', admin_note = ?, reviewed_at = datetime('now') WHERE id = ?").run(note || null, ts.id);
-    for (const l of loadLines(ts.id)) {
+    const method = req.body.payment_method;
+    if (!PAYMENT_METHODS[method]) { flash(req, 'error', 'Please choose the payment method.'); return res.redirect(back); }
+    const lines = loadLines(ts.id);
+    const pays = {};
+    for (const l of lines) {
+      const typed = req.body['pay_' + l.id];
+      const v = typed === undefined || typed === '' ? defaultWorkerPay(l, ts.worker_rate, ts.worker_rate_type) : parseFloat(typed);
+      if (!Number.isFinite(v) || v < 0 || v > 1e7) {
+        flash(req, 'error', 'Please check the numbers for {name}.', { name: l.full_name });
+        return res.redirect(back);
+      }
+      pays[l.id] = Math.round(v * 100) / 100;
+    }
+    db.transaction(() => {
+      db.prepare(`UPDATE timesheets SET status = 'confirmed', admin_note = ?, reviewed_at = datetime('now'), payment_method = ?,
+        client_due_date = ? WHERE id = ?`).run(note || null, method, dueDate(ts.month, ts.client_payment_days), ts.id);
+      const setPay = db.prepare('UPDATE timesheet_lines SET worker_amount = ? WHERE id = ?');
+      for (const l of lines) setPay.run(pays[l.id], l.id);
+    })();
+    const company = ts.show_company ? ts.company_name : { tr: 'a client company' };
+    for (const l of lines) {
       notifyUser(l.worker_id, 'ManpowerHub KSA: Your timesheet for {month} at {company} is confirmed: {days} days, {hours} hours, {amount} SAR. Payment by {method}: {status}.', {
-        month, company: ts.company_name, days: l.days_worked, hours: l.hours, amount: formatMoney(l.amount),
-        method: { tr: PAYMENT_METHODS[ts.payment_method] }, status: { tr: PAYMENT_STATUS[l.payment_status] },
+        month, company, days: l.days_worked, hours: l.hours, amount: formatMoney(pays[l.id]),
+        method: { tr: PAYMENT_METHODS[method] }, status: { tr: PAYMENT_STATUS[l.payment_status] },
       }, '/worker/payments');
     }
     notifyUser(ts.company_id, 'ManpowerHub KSA: Your timesheet for {month} ("{job}") has been confirmed by the admin.', { month, job: ts.demand_title }, '/company/timesheets/' + ts.id);
@@ -185,18 +225,32 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
     res.redirect(back);
   });
 
+  // The company paid the supply company for this timesheet.
+  app.post('/admin/timesheets/:id/client-paid', adminOnly, (req, res) => {
+    const ts = loadTimesheet(req.params.id);
+    if (!ts) return notFound(res);
+    if (ts.status === 'confirmed') {
+      const paidAt = /^\d{4}-\d{2}-\d{2}$/.test(req.body.paid_at || '') ? req.body.paid_at : new Date().toISOString().slice(0, 10);
+      db.prepare('UPDATE timesheets SET client_paid_at = ? WHERE id = ?').run(paidAt, ts.id);
+      flash(req, 'success', 'Company payment recorded.');
+    }
+    res.redirect('/admin/timesheets/' + ts.id);
+  });
+
   // ---------- Payments ----------
   const loadLine = (id) => db.prepare(`
-    SELECT l.*, t.company_id, t.status AS ts_status, t.month, t.payment_method, t.demand_id, c.company_name
+    SELECT l.*, COALESCE(l.worker_amount, l.amount) AS pay, t.company_id, t.status AS ts_status, t.month, t.payment_method,
+      t.demand_id, c.company_name, d.show_company
     FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id JOIN companies c ON c.user_id = t.company_id
+    JOIN demands d ON d.id = t.demand_id
     WHERE l.id = ?`).get(id);
 
-  app.post('/timesheet-lines/:id/paid', requireRole('company', 'admin'),
-    handleUpload(['proof'], (req) => (req.session.user.role === 'admin' ? '/admin/timesheets' : '/company/timesheets'), proofUpload), checkCsrf, (req, res) => {
+  // ManpowerHub KSA pays the worker.
+  app.post('/timesheet-lines/:id/paid', adminOnly, handleUpload(['proof'], '/admin/timesheets', proofUpload), checkCsrf, (req, res) => {
       const line = loadLine(req.params.id);
       const proof = req.files?.proof?.[0];
       if (!canManage(req.session.user, line)) { removeFile(proof?.filename); return notFound(res); }
-      const back = (req.session.user.role === 'admin' ? '/admin/timesheets/' : '/company/timesheets/') + line.timesheet_id;
+      const back = '/admin/timesheets/' + line.timesheet_id;
       if (line.ts_status !== 'confirmed') {
         removeFile(proof?.filename);
         flash(req, 'error', 'The admin must confirm the timesheet before payments are recorded.');
@@ -210,7 +264,8 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
       }
       if (line.payment_status !== 'paid') {
         notifyUser(line.worker_id, 'ManpowerHub KSA: Your payment of {amount} SAR for {month} from {company} has been made by {method}. Your payment slip is ready.', {
-          amount: formatMoney(line.amount), month: { month: line.month }, company: line.company_name, method: { tr: PAYMENT_METHODS[line.payment_method] },
+          amount: formatMoney(line.pay), month: { month: line.month }, company: line.show_company ? line.company_name : { tr: 'a client company' },
+          method: { tr: PAYMENT_METHODS[line.payment_method] },
         }, '/worker/payments');
       }
       flash(req, 'success', 'Payment recorded. The worker has been informed.');
@@ -220,11 +275,12 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
   // ---------- Worker ----------
   app.get('/worker/payments', requireRole('worker'), (req, res) => {
     const lines = db.prepare(`
-      SELECT l.*, t.month, t.payment_method, d.title AS demand_title, c.company_name, c.logo_file
+      SELECT l.*, COALESCE(l.worker_amount, l.amount) AS pay, t.month, t.payment_method, d.title AS demand_title, d.show_company,
+        c.company_name, c.logo_file
       FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id JOIN demands d ON d.id = t.demand_id
       JOIN companies c ON c.user_id = t.company_id
       WHERE l.worker_id = ? AND t.status = 'confirmed' ORDER BY t.month DESC, l.id DESC`).all(req.session.user.id);
-    const totals = lines.reduce((s, l) => ({ hours: s.hours + l.hours, paid: s.paid + (l.payment_status === 'paid' ? l.amount : 0), pending: s.pending + (l.payment_status === 'paid' ? 0 : l.amount) }), { hours: 0, paid: 0, pending: 0 });
+    const totals = lines.reduce((s, l) => ({ hours: s.hours + l.hours, paid: s.paid + (l.payment_status === 'paid' ? l.pay : 0), pending: s.pending + (l.payment_status === 'paid' ? 0 : l.pay) }), { hours: 0, paid: 0, pending: 0 });
     res.render('worker/payments', { title: 'My payments', lines, totals });
   });
 
@@ -244,16 +300,17 @@ module.exports = function timesheetRoutes(app, { db, flash, requireRole, handleU
     sendStored(res, ts.file_name, ts.original_name, ts.mime_type);
   });
 
-  const canSeeLine = (user, line) => line && (canManage(user, line) || (user.role === 'worker' && line.worker_id === user.id && line.ts_status === 'confirmed'));
+  // Worker pay is between ManpowerHub KSA and the worker: companies do not see slips or receipts.
+  const canSeeLine = (user, line) => line && (user.role === 'admin' || (user.role === 'worker' && line.worker_id === user.id && line.ts_status === 'confirmed'));
 
-  app.get('/timesheet-lines/:id/proof', requireRole('worker', 'company', 'admin'), (req, res) => {
+  app.get('/timesheet-lines/:id/proof', requireRole('worker', 'admin'), (req, res) => {
     const line = loadLine(req.params.id);
     if (!canSeeLine(req.session.user, line) || !line.proof_file) return notFound(res, 'Document not found.');
     sendStored(res, line.proof_file, line.proof_name, line.proof_mime);
   });
 
   // Printable payment slip for one worker and month.
-  app.get('/payslips/:id', requireRole('worker', 'company', 'admin'), (req, res) => {
+  app.get('/payslips/:id', requireRole('worker', 'admin'), (req, res) => {
     const line = loadLine(req.params.id);
     if (!canSeeLine(req.session.user, line) || line.ts_status !== 'confirmed') return notFound(res, 'Payment slip not found.');
     const ts = loadTimesheet(line.timesheet_id);

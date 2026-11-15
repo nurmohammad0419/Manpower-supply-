@@ -190,7 +190,9 @@ CREATE INDEX IF NOT EXISTS idx_worker_positions_category ON worker_positions(cat
 // Add columns introduced after the first release (safe to run on every start).
 function addColumn(table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
-  if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  if (cols.includes(column)) return false;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  return true;
 }
 addColumn('users', 'lang', "TEXT NOT NULL DEFAULT 'en'");
 addColumn('users', 'notify_channel', "TEXT NOT NULL DEFAULT 'whatsapp'");
@@ -207,6 +209,31 @@ addColumn('workers', 'bank_name', 'TEXT');
 addColumn('workers', 'iban', 'TEXT');
 addColumn('workers', 'job_alerts', 'INTEGER NOT NULL DEFAULT 1');
 addColumn('demands', 'announced_at', 'TEXT');
+
+// Supply-company model: the company's demand (its rate and terms) is checked by the admin, who signs the
+// agreement with the company and then publishes a job post for workers with the worker's rate and terms.
+addColumn('demands', 'client_payment_days', 'INTEGER NOT NULL DEFAULT 30'); // company pays the supplier within N days
+addColumn('demands', 'admin_note', 'TEXT');
+addColumn('demands', 'worker_rate', 'REAL');
+addColumn('demands', 'worker_rate_type', 'TEXT');
+addColumn('demands', 'worker_pay_days', 'INTEGER NOT NULL DEFAULT 7'); // worker salary paid within N days after month end
+addColumn('demands', 'local_transport', 'INTEGER NOT NULL DEFAULT 1'); // job inside the worker's city: supplier gives transport
+addColumn('demands', 'outside_accommodation', 'INTEGER NOT NULL DEFAULT 1'); // job outside the worker's city
+addColumn('demands', 'outside_food', 'INTEGER NOT NULL DEFAULT 1');
+addColumn('demands', 'worker_terms', 'TEXT');
+addColumn('demands', 'show_company', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('demands', 'agreement_signed', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('demands', 'agreement_file', 'TEXT');
+addColumn('demands', 'agreement_name', 'TEXT');
+addColumn('demands', 'published_at', 'TEXT');
+if (addColumn('demands', 'review_status', "TEXT NOT NULL DEFAULT 'pending'")) {
+  // Demands created before this model were already public: keep them published with the same rate.
+  db.exec(`UPDATE demands SET review_status = 'published', worker_rate = salary_amount, worker_rate_type = salary_type,
+    show_company = 1, published_at = created_at`);
+}
+addColumn('timesheet_lines', 'worker_amount', 'REAL'); // what the worker is paid (set by the admin)
+addColumn('timesheets', 'client_due_date', 'TEXT'); // when the company must pay the supplier
+addColumn('timesheets', 'client_paid_at', 'TEXT');
 // Workers registered before positions existed: their main profession is their position.
 db.exec('INSERT OR IGNORE INTO worker_positions (worker_id, category) SELECT user_id, profession FROM workers');
 

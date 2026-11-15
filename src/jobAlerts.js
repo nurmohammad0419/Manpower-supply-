@@ -2,8 +2,8 @@
 //
 // A worker can work in several positions (their main profession plus others). When a company posts a
 // demand, every worker with a matching position who wants job alerts gets a WhatsApp / SMS message.
-// A demand is announced once, when it is open and its company is approved (so demands posted before
-// the company was approved are announced when the admin approves it).
+// A demand is announced once, when the admin publishes it (or, if it was published while the company
+// was not approved, when the company is approved). Workers see the worker rate, not the company's rate.
 const db = require('./db');
 const { CATEGORIES, SALARY_TYPES } = require('./constants');
 const { notifyUser } = require('./notify');
@@ -27,7 +27,7 @@ function savePositions(workerId, positions) {
 function announceDemand(demandId) {
   const d = db.prepare(`SELECT d.*, c.company_name, c.status AS company_status FROM demands d
     JOIN companies c ON c.user_id = d.company_id WHERE d.id = ?`).get(demandId);
-  if (!d || d.status !== 'open' || d.company_status !== 'approved' || d.announced_at) return 0;
+  if (!d || d.status !== 'open' || d.company_status !== 'approved' || d.review_status !== 'published' || d.announced_at) return 0;
   if (d.deadline && d.deadline < new Date().toISOString().slice(0, 10)) return 0;
   // Mark first, so the same demand is never announced twice.
   if (!db.prepare("UPDATE demands SET announced_at = datetime('now') WHERE id = ? AND announced_at IS NULL").run(d.id).changes) return 0;
@@ -39,8 +39,8 @@ function announceDemand(demandId) {
       AND p.worker_id NOT IN (SELECT worker_id FROM applications WHERE demand_id = ?)`).all(d.category, d.id);
 
   const params = {
-    position: { tr: d.category }, job: d.title, company: d.company_name, city: { tr: d.location_city },
-    rate: d.salary_amount, per: { tr: SALARY_TYPES[d.salary_type] },
+    position: { tr: d.category }, job: d.title, company: d.show_company ? d.company_name : { tr: 'a client company' },
+    city: { tr: d.location_city }, rate: d.worker_rate, per: { tr: SALARY_TYPES[d.worker_rate_type] },
   };
   // Send one after another in the background so a large list does not flood the provider.
   (async () => {

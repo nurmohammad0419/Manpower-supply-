@@ -1,0 +1,8 @@
+<% /* The worker's terms set by the supply company. Optional local: workerCity (highlights the row that applies). */ %>
+<% const local = locals.workerCity && workerCity === d.location_city; const outside = locals.workerCity && workerCity !== d.location_city;
+   const outsideText = d.outside_accommodation && d.outside_food ? 'Accommodation and food provided' : d.outside_accommodation ? 'Accommodation provided' : d.outside_food ? 'Food provided' : 'Not provided'; %>
+<tr><th><%= t('Salary payment') %></th><td><%= t('Paid within {n} days after the end of each month', { n: d.worker_pay_days }) %></td></tr>
+<tr class="<%= local ? 'applies' : '' %>"><th><%= t('If you live in {city}', { city: t(d.location_city) }) %></th>
+  <td><%= d.local_transport ? t('Transport to work provided by ManpowerHub KSA') : t('Not provided') %><% if (local) { %> <span class="badge badge-hired"><%= t('Applies to you') %></span><% } %></td></tr>
+<tr class="<%= outside ? 'applies' : '' %>"><th><%= t('If you come from another city') %></th>
+  <td><%= t(outsideText) %><% if (outside) { %> <span class="badge badge-hired"><%= t('Applies to you') %></span><% } %></td></tr>

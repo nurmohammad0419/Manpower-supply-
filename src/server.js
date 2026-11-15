@@ -3,10 +3,11 @@ const fs = require('fs');
 const crypto = require('crypto');
 const db = require('./db');
 const web = require('./lib/web');
+const { escapeHtml } = require('./lib/template');
 const { hashPassword, verifyPassword } = require('./lib/password');
 const {
   CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES,
-  KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES, TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS,
+  KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES, TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REVIEW_STATUS,
 } = require('./constants');
 const { notifyUser } = require('./notify');
 const jobAlerts = require('./jobAlerts');
@@ -72,10 +73,11 @@ app.use((req, res, next) => {
   res.locals.currentUrl = req.originalUrl;
   Object.assign(res.locals, {
     CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES, LANGUAGES,
-    KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES, TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS,
+    KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES, TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REVIEW_STATUS,
   });
   res.locals.fmtMonth = (ym) => formatMonth(ym, req.lang);
   res.locals.money = formatMoney;
+  res.locals.escapeHtml = escapeHtml;
   const t = req.t;
   const lang = LANGUAGES[req.lang];
   Object.assign(res.locals, { t, lang: req.lang, dir: lang.dir });
@@ -200,14 +202,14 @@ function workerExtraColumns(b) {
 // ---------- Public pages ----------
 app.get('/', (req, res) => {
   const stats = {
-    openDemands: db.prepare("SELECT COUNT(*) n FROM demands d JOIN companies c ON c.user_id=d.company_id WHERE d.status='open' AND c.status='approved'").get().n,
-    positions: db.prepare("SELECT COALESCE(SUM(quantity),0) n FROM demands d JOIN companies c ON c.user_id=d.company_id WHERE d.status='open' AND c.status='approved'").get().n,
+    openDemands: db.prepare("SELECT COUNT(*) n FROM demands d JOIN companies c ON c.user_id=d.company_id WHERE d.status='open' AND c.status='approved' AND d.review_status='published'").get().n,
+    positions: db.prepare("SELECT COALESCE(SUM(quantity),0) n FROM demands d JOIN companies c ON c.user_id=d.company_id WHERE d.status='open' AND c.status='approved' AND d.review_status='published'").get().n,
     companies: db.prepare("SELECT COUNT(*) n FROM companies WHERE status='approved'").get().n,
     workers: db.prepare('SELECT COUNT(*) n FROM workers').get().n,
   };
   const latest = db.prepare(`
     SELECT d.*, c.company_name, c.logo_file FROM demands d JOIN companies c ON c.user_id = d.company_id
-    WHERE d.status='open' AND c.status='approved' ORDER BY d.created_at DESC LIMIT 6`).all();
+    WHERE d.status='open' AND c.status='approved' AND d.review_status='published' ORDER BY d.published_at DESC LIMIT 6`).all();
   res.render('home', { title: 'Home', stats, latest });
 });
 
@@ -215,16 +217,17 @@ app.get('/demands', (req, res) => {
   const q = str(req.query.q, 100);
   const category = str(req.query.category, 100);
   const city = str(req.query.city, 100);
-  const where = ["d.status = 'open'", "c.status = 'approved'", "(d.deadline IS NULL OR d.deadline = '' OR d.deadline >= date('now'))"];
+  const where = ["d.status = 'open'", "c.status = 'approved'", "d.review_status = 'published'", "(d.deadline IS NULL OR d.deadline = '' OR d.deadline >= date('now'))"];
   const params = [];
-  if (q) { where.push('(d.title LIKE ? OR d.requirements LIKE ? OR c.company_name LIKE ?)'); params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+  // Company names are only searchable when the admin chose to show them to workers.
+  if (q) { where.push('(d.title LIKE ? OR d.requirements LIKE ? OR (d.show_company = 1 AND c.company_name LIKE ?))'); params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
   if (category) { where.push('d.category = ?'); params.push(category); }
   if (city) { where.push('d.location_city = ?'); params.push(city); }
   const demands = db.prepare(`
     SELECT d.*, c.company_name, c.logo_file,
       (SELECT COUNT(*) FROM applications a WHERE a.demand_id = d.id AND a.status = 'hired') AS hired_count
     FROM demands d JOIN companies c ON c.user_id = d.company_id
-    WHERE ${where.join(' AND ')} ORDER BY d.created_at DESC LIMIT 200`).all(...params);
+    WHERE ${where.join(' AND ')} ORDER BY d.published_at DESC LIMIT 200`).all(...params);
   res.render('demands', { title: 'Job Demands', demands, filters: { q, category, city } });
 });
 
@@ -232,23 +235,26 @@ app.get('/demands/:id', (req, res) => {
   const demand = getDemand(req.params.id);
   const u = req.session.user;
   const isOwner = u && u.role === 'company' && demand && demand.company_id === u.id;
-  const visible = demand && ((demand.status === 'open' && demand.company_status === 'approved') || isOwner || (u && u.role === 'admin'));
+  const isPublic = demand && demand.status === 'open' && demand.company_status === 'approved' && demand.review_status === 'published';
+  const visible = isPublic || isOwner || (u && u.role === 'admin');
   if (!visible) return res.status(404).render('error', { title: 'Not found', message: 'This demand does not exist or is no longer available.' });
   let application = null;
   let docs = [];
+  let workerCity = null;
   if (u && u.role === 'worker') {
     application = db.prepare('SELECT * FROM applications WHERE demand_id = ? AND worker_id = ?').get(demand.id, u.id);
     docs = db.prepare('SELECT DISTINCT doc_type FROM documents WHERE worker_id = ?').all(u.id).map((r) => r.doc_type);
+    workerCity = db.prepare('SELECT city FROM workers WHERE user_id = ?').get(u.id).city;
   }
-  res.render('demand-detail', { title: demand.title, demand, application, workerDocTypes: docs, isOwner });
+  res.render('demand-detail', { title: demand.title, demand, application, workerDocTypes: docs, isOwner, workerCity });
 });
 
-// Printable demand letter (digital version of the paper demand).
+// Printable job offer from the supply company, with the worker's terms (digital version of the paper demand).
 app.get('/demands/:id/letter', (req, res) => {
   const demand = getDemand(req.params.id);
   const u = req.session.user;
   const isOwner = u && u.role === 'company' && demand && demand.company_id === u.id;
-  if (!demand || !(demand.company_status === 'approved' || isOwner || (u && u.role === 'admin'))) {
+  if (!demand || !((demand.company_status === 'approved' && demand.review_status === 'published') || isOwner || (u && u.role === 'admin'))) {
     return res.status(404).render('error', { title: 'Not found', message: 'Demand not found.' });
   }
   res.render('demand-letter', { title: 'Demand Letter', demand, layout: false });
@@ -360,149 +366,9 @@ app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/')));
 // ---------- Company area ----------
 const companyOnly = requireRole('company');
 
-app.get('/company', companyOnly, (req, res) => {
-  const company = db.prepare('SELECT * FROM companies WHERE user_id = ?').get(req.session.user.id);
-  const demands = db.prepare(`
-    SELECT d.*,
-      (SELECT COUNT(*) FROM applications a WHERE a.demand_id=d.id AND a.status != 'withdrawn') AS applicant_count,
-      (SELECT COUNT(*) FROM applications a WHERE a.demand_id=d.id AND a.status = 'applied') AS new_count,
-      (SELECT COUNT(*) FROM applications a WHERE a.demand_id=d.id AND a.status = 'hired') AS hired_count
-    FROM demands d WHERE d.company_id = ? ORDER BY d.created_at DESC`).all(req.session.user.id);
-  res.render('company/dashboard', { title: 'Company Dashboard', company, demands });
-});
-
-function demandFromBody(b) {
-  const docs = [].concat(b.required_docs || []).filter((d) => DOC_TYPES[d]);
-  const d = {
-    title: str(b.title, 150), category: str(b.category, 100), quantity: int(b.quantity),
-    salary_amount: parseFloat(b.salary_amount), salary_type: str(b.salary_type, 10),
-    hours_per_day: int(b.hours_per_day), days_per_week: int(b.days_per_week, 6), duration: str(b.duration, 100),
-    location_city: str(b.location_city, 100), work_site: str(b.work_site, 200),
-    food: str(b.food, 10) || 'no', accommodation: str(b.accommodation, 10) || 'no', transport: str(b.transport, 10) || 'no',
-    overtime: str(b.overtime, 200), requirements: str(b.requirements, 3000), required_docs: docs.join(','),
-    start_date: str(b.start_date, 10), deadline: str(b.deadline, 10),
-  };
-  let error = null;
-  if (!d.title) error = 'Job title is required.';
-  else if (!CATEGORIES.includes(d.category)) error = 'Please choose a category.';
-  else if (d.quantity < 1 || d.quantity > 10000) error = 'Number of workers must be between 1 and 10000.';
-  else if (!Number.isFinite(d.salary_amount) || d.salary_amount < 0) error = 'Please enter a valid salary / rate.';
-  else if (!SALARY_TYPES[d.salary_type]) error = 'Please choose the salary type.';
-  else if (d.hours_per_day < 1 || d.hours_per_day > 24) error = 'Working hours per day must be between 1 and 24.';
-  else if (d.days_per_week < 1 || d.days_per_week > 7) error = 'Working days per week must be between 1 and 7.';
-  else if (!d.duration) error = 'Contract duration is required.';
-  else if (!d.location_city) error = 'Work location is required.';
-  return { d, error };
-}
-
-app.get('/company/demands/new', companyOnly, (req, res) => {
-  res.render('company/demand-form', { title: 'Post a Demand', form: { required_docs: 'iqama,passport,photo', days_per_week: 6, hours_per_day: 8, salary_type: 'hourly' }, action: '/company/demands' });
-});
-
-app.post('/company/demands', companyOnly, (req, res) => {
-  const { d, error } = demandFromBody(req.body);
-  if (error) return res.status(400).render('company/demand-form', { title: 'Post a Demand', form: { ...req.body, required_docs: d.required_docs }, error, action: '/company/demands' });
-  const info = db.prepare(`INSERT INTO demands (company_id, title, category, quantity, salary_amount, salary_type, hours_per_day, days_per_week,
-    duration, location_city, work_site, food, accommodation, transport, overtime, requirements, required_docs, start_date, deadline)
-    VALUES (@company_id,@title,@category,@quantity,@salary_amount,@salary_type,@hours_per_day,@days_per_week,@duration,@location_city,
-    @work_site,@food,@accommodation,@transport,@overtime,@requirements,@required_docs,@start_date,@deadline)`).run({ ...d, company_id: req.session.user.id });
-  const told = jobAlerts.announceDemand(info.lastInsertRowid);
-  if (told) flash(req, 'success', 'Demand posted. {n} workers with this position were sent a message.', { n: told });
-  else flash(req, 'success', 'Demand posted. Workers can now see and apply to it.');
-  res.redirect('/company/demands/' + info.lastInsertRowid);
-});
-
-function ownDemand(req, res) {
-  const demand = getDemand(req.params.id);
-  if (!demand || demand.company_id !== req.session.user.id) {
-    res.status(404).render('error', { title: 'Not found', message: 'Demand not found.' });
-    return null;
-  }
-  return demand;
-}
-
-app.get('/company/demands/:id/edit', companyOnly, (req, res) => {
-  const demand = ownDemand(req, res); if (!demand) return;
-  res.render('company/demand-form', { title: 'Edit Demand', form: demand, action: `/company/demands/${demand.id}/edit` });
-});
-
-app.post('/company/demands/:id/edit', companyOnly, (req, res) => {
-  const demand = ownDemand(req, res); if (!demand) return;
-  const { d, error } = demandFromBody(req.body);
-  if (error) return res.status(400).render('company/demand-form', { title: 'Edit Demand', form: { ...req.body, required_docs: d.required_docs }, error, action: `/company/demands/${demand.id}/edit` });
-  db.prepare(`UPDATE demands SET title=@title, category=@category, quantity=@quantity, salary_amount=@salary_amount, salary_type=@salary_type,
-    hours_per_day=@hours_per_day, days_per_week=@days_per_week, duration=@duration, location_city=@location_city, work_site=@work_site,
-    food=@food, accommodation=@accommodation, transport=@transport, overtime=@overtime, requirements=@requirements,
-    required_docs=@required_docs, start_date=@start_date, deadline=@deadline WHERE id=@id`).run({ ...d, id: demand.id });
-  flash(req, 'success', 'Demand updated.');
-  res.redirect('/company/demands/' + demand.id);
-});
-
-app.post('/company/demands/:id/status', companyOnly, (req, res) => {
-  const demand = ownDemand(req, res); if (!demand) return;
-  const status = req.body.status === 'closed' ? 'closed' : 'open';
-  db.prepare('UPDATE demands SET status = ? WHERE id = ?').run(status, demand.id);
-  flash(req, 'success', status === 'closed' ? 'Demand closed. Workers can no longer apply.' : 'Demand re-opened.');
-  res.redirect('/company/demands/' + demand.id);
-});
-
-app.get('/company/demands/:id', companyOnly, (req, res) => {
-  const demand = ownDemand(req, res); if (!demand) return;
-  const filter = APP_STATUS[req.query.status] ? req.query.status : '';
-  const applications = db.prepare(`
-    SELECT a.*, w.full_name, w.nationality, w.profession, w.experience_years, w.iqama_number, w.city, u.phone, u.email
-    FROM applications a JOIN workers w ON w.user_id = a.worker_id JOIN users u ON u.id = w.user_id
-    WHERE a.demand_id = ? ${filter ? 'AND a.status = ?' : "AND a.status != 'withdrawn'"}
-    ORDER BY CASE a.status WHEN 'hired' THEN 0 WHEN 'shortlisted' THEN 1 WHEN 'applied' THEN 2 ELSE 3 END, a.created_at`)
-    .all(...(filter ? [demand.id, filter] : [demand.id]));
-  const counts = Object.fromEntries(db.prepare('SELECT status, COUNT(*) n FROM applications WHERE demand_id = ? GROUP BY status').all(demand.id).map((r) => [r.status, r.n]));
-  res.render('company/demand-applicants', { title: demand.title, demand, applications, counts, filter });
-});
-
-function companyApplication(req, res) {
-  const a = db.prepare(`SELECT a.*, d.company_id, d.title AS demand_title, d.required_docs, d.quantity, d.id AS demand_id
-    FROM applications a JOIN demands d ON d.id = a.demand_id WHERE a.id = ?`).get(req.params.id);
-  if (!a || a.company_id !== req.session.user.id) {
-    res.status(404).render('error', { title: 'Not found', message: 'Application not found.' });
-    return null;
-  }
-  return a;
-}
-
-app.get('/company/applications/:id', companyOnly, (req, res) => {
-  const a = companyApplication(req, res); if (!a) return;
-  const worker = db.prepare('SELECT w.*, u.email, u.phone FROM workers w JOIN users u ON u.id = w.user_id WHERE w.user_id = ?').get(a.worker_id);
-  const documents = db.prepare('SELECT * FROM documents WHERE worker_id = ? ORDER BY doc_type, uploaded_at DESC').all(a.worker_id);
-  res.render('company/application', { title: worker.full_name, a, worker, documents, extras: workerExtras(a.worker_id), positions: jobAlerts.workerPositions(a.worker_id) });
-});
-
-app.post('/company/applications/:id/status', companyOnly, (req, res) => {
-  const a = companyApplication(req, res); if (!a) return;
-  const status = str(req.body.status, 20);
-  if (!['applied', 'shortlisted', 'hired', 'rejected'].includes(status) || a.status === 'withdrawn') {
-    flash(req, 'error', 'Invalid status change.');
-    return res.redirect('/company/applications/' + a.id);
-  }
-  if (status === 'hired' && a.status !== 'hired') {
-    const hired = db.prepare("SELECT COUNT(*) n FROM applications WHERE demand_id = ? AND status = 'hired'").get(a.demand_id).n;
-    if (hired >= a.quantity) {
-      flash(req, 'error', 'You already hired {hired} of {quantity} workers. Increase the quantity in the demand to hire more.', { hired, quantity: a.quantity });
-      return res.redirect('/company/applications/' + a.id);
-    }
-  }
-  const note = str(req.body.company_note, 1000);
-  db.prepare("UPDATE applications SET status = ?, company_note = ?, updated_at = datetime('now') WHERE id = ?").run(status, note, a.id);
-  if (status !== a.status) {
-    const message = {
-      shortlisted: 'ManpowerHub KSA: You have been shortlisted for "{job}" at {company}.',
-      hired: 'ManpowerHub KSA: Congratulations! {company} has hired you for "{job}".',
-      rejected: 'ManpowerHub KSA: Your application for "{job}" at {company} was not selected this time.',
-    }[status];
-    const company = db.prepare('SELECT company_name FROM companies WHERE user_id = ?').get(a.company_id).company_name;
-    if (message) notifyUser(a.worker_id, message, { job: a.demand_title, company, note: status === 'rejected' ? '' : note }, '/worker');
-  }
-  flash(req, 'success', 'Applicant marked as {status}.', { status: req.t(APP_STATUS[status]) });
-  res.redirect(req.body.back === 'list' ? '/company/demands/' + a.demand_id : '/company/applications/' + a.id);
+// Demands, agreements, publishing and applications (see src/demands.js).
+require('./demands')(app, {
+  db, flash, requireRole, handleUpload, checkCsrf, str, int, notifyUser, UPLOAD_DIR, getDemand, workerExtras, jobAlerts,
 });
 
 app.get('/company/profile', companyOnly, (req, res) => {
@@ -536,7 +402,7 @@ const workerOnly = requireRole('worker');
 app.get('/worker', workerOnly, (req, res) => {
   const worker = db.prepare('SELECT * FROM workers WHERE user_id = ?').get(req.session.user.id);
   const applications = db.prepare(`
-    SELECT a.*, d.title, d.salary_amount, d.salary_type, d.location_city, d.status AS demand_status, c.company_name
+    SELECT a.*, d.title, d.worker_rate, d.worker_rate_type, d.location_city, d.status AS demand_status, d.show_company, c.company_name
     FROM applications a JOIN demands d ON d.id = a.demand_id JOIN companies c ON c.user_id = d.company_id
     WHERE a.worker_id = ? ORDER BY a.updated_at DESC`).all(req.session.user.id);
   const docTypes = db.prepare('SELECT DISTINCT doc_type FROM documents WHERE worker_id = ?').all(req.session.user.id).map((r) => r.doc_type);
@@ -608,7 +474,7 @@ app.post('/demands/:id/apply', workerOnly, handleUpload(docFields, (req) => '/de
   const demand = getDemand(req.params.id);
   const workerId = req.session.user.id;
   const back = '/demands/' + req.params.id;
-  if (!demand || demand.status !== 'open' || demand.company_status !== 'approved' || (demand.deadline && demand.deadline < new Date().toISOString().slice(0, 10))) {
+  if (!demand || demand.status !== 'open' || demand.company_status !== 'approved' || demand.review_status !== 'published' || (demand.deadline && demand.deadline < new Date().toISOString().slice(0, 10))) {
     flash(req, 'error', 'This demand is no longer accepting applications.');
     return res.redirect('/demands');
   }
@@ -630,7 +496,6 @@ app.post('/demands/:id/apply', workerOnly, handleUpload(docFields, (req) => '/de
   } else {
     db.prepare('INSERT INTO applications (demand_id, worker_id, cover_note) VALUES (?,?,?)').run(demand.id, workerId, str(req.body.cover_note, 1000));
   }
-  notifyUser(demand.company_id, 'ManpowerHub KSA: New application from {name} for "{job}".', { name: req.session.user.name, job: demand.title }, `/company/demands/${demand.id}`);
   flash(req, 'success', 'Application submitted! The company will review your documents. Track the status from your dashboard.');
   res.redirect('/worker');
 });
@@ -651,9 +516,9 @@ app.get('/documents/:id', requireRole('worker', 'company', 'admin'), (req, res) 
     if (u.role === 'admin') allowed = true;
     else if (u.role === 'worker') allowed = doc.worker_id === u.id;
     else if (u.role === 'company') {
-      // A company may see a worker's documents only if that worker applied to one of its demands.
+      // A company may see a worker's documents only after the admin assigned that worker to it.
       allowed = !!db.prepare(`SELECT 1 FROM applications a JOIN demands d ON d.id = a.demand_id
-        WHERE a.worker_id = ? AND d.company_id = ? AND a.status != 'withdrawn'`).get(doc.worker_id, u.id);
+        WHERE a.worker_id = ? AND d.company_id = ? AND a.status = 'hired'`).get(doc.worker_id, u.id);
     }
   }
   if (!allowed) return res.status(404).render('error', { title: 'Not found', message: 'Document not found.' });
@@ -675,6 +540,7 @@ app.get('/admin', adminOnly, (req, res) => {
     applications: db.prepare('SELECT COUNT(*) n FROM applications').get().n,
     hired: db.prepare("SELECT COUNT(*) n FROM applications WHERE status='hired'").get().n,
     timesheets: db.prepare("SELECT COUNT(*) n FROM timesheets WHERE status='submitted'").get().n,
+    toReview: db.prepare("SELECT COUNT(*) n FROM demands WHERE review_status='pending'").get().n,
   };
   const companies = db.prepare(`SELECT c.*, u.email, u.phone, u.created_at,
     (SELECT COUNT(*) FROM demands d WHERE d.company_id = c.user_id) AS demand_count

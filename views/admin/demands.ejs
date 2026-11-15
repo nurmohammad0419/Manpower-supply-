@@ -1,0 +1,29 @@
+<%- include('../partials/header') %>
+<h1><%= t('Demands') %></h1>
+<div class="tabs">
+  <a href="?" class="<%= !filter ? 'active' : '' %>"><%= t('All') %></a>
+  <% Object.entries(REVIEW_STATUS).forEach(([k, v]) => { %><a href="?review=<%= k %>" class="<%= filter === k ? 'active' : '' %>"><%= t(v) %></a><% }) %>
+</div>
+<% if (!demands.length) { %>
+  <div class="card empty"><%= t('No demands yet.') %></div>
+<% } else { %>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th><%= t('Demand') %></th><th><%= t('Company') %></th><th><%= t('Company rate') %></th><th><%= t('Worker rate') %></th><th><%= t('Applicants') %></th><th><%= t('Assigned') %></th><th><%= t('Admin review') %></th></tr></thead>
+    <tbody>
+    <% demands.forEach(d => { %>
+      <tr>
+        <td><a href="/admin/demands/<%= d.id %>"><b><bdi><%= d.title %></bdi></b></a><div class="small muted"><%= t(d.category) %> · <%= t(d.location_city) %> · <%= fmtDate(d.created_at) %></div></td>
+        <td><bdi><%= d.company_name %></bdi><% if (d.company_status !== 'approved') { %><div><span class="badge badge-applied"><%= t('Pending') %></span></div><% } %></td>
+        <td class="nowrap"><%= d.salary_amount %> <span class="small muted"><%= t(SALARY_TYPES[d.salary_type]) %></span></td>
+        <td class="nowrap"><%= d.worker_rate ?? '—' %> <span class="small muted"><%= d.worker_rate_type ? t(SALARY_TYPES[d.worker_rate_type]) : '' %></span></td>
+        <td><%= d.applicant_count %> <% if (d.new_count) { %><span class="badge badge-applied"><%= t('{n} new', { n: d.new_count }) %></span><% } %></td>
+        <td><%= d.hired_count %> / <%= d.quantity %></td>
+        <td><%- include('../partials/review-badge', { status: d.review_status }) %><% if (d.status !== 'open') { %> <span class="badge"><%= t('Closed') %></span><% } %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+<%- include('../partials/footer') %>

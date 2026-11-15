@@ -1,31 +1,31 @@
 <!doctype html>
 <html lang="<%= lang %>" dir="<%= dir %>"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title><%= t('Demand Letter') %> #<%= demand.id %></title><link rel="stylesheet" href="/style.css"></head>
+<title><%= t('Job offer') %> #<%= demand.id %></title><link rel="stylesheet" href="/style.css"></head>
 <body class="letter-body">
 <div class="letter">
   <div class="letter-head">
-    <div class="letter-company"><%- include('partials/logo', { file: demand.logo_file, size: 'lg' }) %><div><h1><bdi><%= demand.company_name %></bdi></h1><div><%= t('CR No.') %>: <%= demand.cr_number %> · <%= t(demand.company_city) %></div></div></div>
-    <div class="right"><b><%= t('DEMAND LETTER') %></b><br><%= t('Ref') %>: MH-<%= String(demand.id).padStart(5, '0') %><br><%= t('Date') %>: <%= fmtDate(demand.created_at) %></div>
+    <div class="letter-company"><span class="logo lg-logo">MH</span><div><h1>ManpowerHub KSA</h1><div><%= t('Manpower supply company') %></div></div></div>
+    <div class="right"><b><%= t('JOB OFFER') %></b><br><%= t('Ref') %>: MH-<%= String(demand.id).padStart(5, '0') %><br><%= t('Date') %>: <%= fmtDate(demand.published_at || demand.created_at) %></div>
   </div>
-  <p><%= t('We require the following manpower. Interested candidates may apply online at ManpowerHub KSA with the documents listed below.') %></p>
+  <p><%= t('ManpowerHub KSA requires the following workers for a client project. Workers are employed and paid by ManpowerHub KSA. Apply online with the documents listed below.') %></p>
   <table class="letter-table">
     <tr><th><%= t('Position') %></th><td><bdi><%= demand.title %></bdi> (<%= t(demand.category) %>)</td></tr>
+    <tr><th><%= t('Work at') %></th><td><% if (demand.show_company) { %><bdi><%= demand.company_name %></bdi><% } else { %><%= t('Client company') %><% } %></td></tr>
     <tr><th><%= t('Number of workers') %></th><td><%= demand.quantity %></td></tr>
-    <tr><th><%= t('Salary / Rate') %></th><td><%= demand.salary_amount %> <%= t('SAR') %> <%= t(SALARY_TYPES[demand.salary_type]) %></td></tr>
+    <tr><th><%= t('Salary / Rate') %></th><td><%= demand.worker_rate ?? '—' %> <%= t('SAR') %> <%= t(SALARY_TYPES[demand.worker_rate_type] || '') %></td></tr>
     <tr><th><%= t('Working hours') %></th><td><%= t('{h} hours/day, {d} days/week', { h: demand.hours_per_day, d: demand.days_per_week }) %></td></tr>
     <tr><th><%= t('Overtime') %></th><td><bdi><%= demand.overtime || '—' %></bdi></td></tr>
     <tr><th><%= t('Contract duration') %></th><td><bdi><%= demand.duration %></bdi></td></tr>
     <tr><th><%= t('Work location') %></th><td><%= t(demand.location_city) %><% if (demand.work_site) { %> — <bdi><%= demand.work_site %></bdi><% } %></td></tr>
-    <tr><th><%= t('Food') %></th><td><%= yesNo(demand.food) %></td></tr>
-    <tr><th><%= t('Accommodation') %></th><td><%= yesNo(demand.accommodation) %></td></tr>
-    <tr><th><%= t('Transport') %></th><td><%= yesNo(demand.transport) %></td></tr>
+    <%- include('partials/worker-terms', { d: demand, workerCity: null }) %>
     <tr><th><%= t('Start date') %></th><td><%= demand.start_date ? fmtDate(demand.start_date) : t('Immediate') %></td></tr>
     <tr><th><%= t('Last date to apply') %></th><td><%= demand.deadline ? fmtDate(demand.deadline) : t('Until filled') %></td></tr>
     <tr><th><%= t('Documents required') %></th><td><%= demand.required_docs.split(',').filter(Boolean).map(d => t(DOC_TYPES[d])).join(', ') || '—' %></td></tr>
   </table>
+  <% if (demand.worker_terms) { %><h3><%= t('Terms and conditions') %></h3><p class="prewrap" dir="auto"><bdi><%= demand.worker_terms %></bdi></p><% } %>
   <% if (demand.requirements) { %><h3><%= t('Other requirements') %></h3><p class="prewrap" dir="auto"><bdi><%= demand.requirements %></bdi></p><% } %>
   <div class="letter-sign">
-    <div><%= t('Contact person') %>: <b><bdi><%= demand.contact_person %></bdi></b></div>
+    <div><%= t('Issued by') %>: <b>ManpowerHub KSA</b></div>
     <div class="sigline"><%= t('Authorized signature & stamp') %></div>
   </div>
   <button class="btn noprint" onclick="window.print()"><%= t('Print / Save as PDF') %></button>

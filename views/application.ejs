@@ -1,10 +1,11 @@
-<%- include('../partials/header') %>
+<%- include('partials/header') %>
 <% const req = a.required_docs.split(',').filter(Boolean); const have = new Set(documents.map(d => d.doc_type)); %>
-<div class="crumbs"><a href="/company/demands/<%= a.demand_id %>"><span class="arr">←</span> <bdi><%= a.demand_title %></bdi></a></div>
+<div class="crumbs"><a href="<%= back %>"><span class="arr">←</span> <bdi><%= a.demand_title %></bdi></a></div>
 <div class="detail">
   <div class="card">
     <h1><bdi><%= worker.full_name %></bdi></h1>
     <p><%= t('Status') %>: <span class="badge badge-<%= a.status %>"><%= t(APP_STATUS[a.status]) %></span></p>
+    <% if (!showContact) { %><p class="small muted"><%= t('This worker was assigned to you by ManpowerHub KSA. Please contact ManpowerHub KSA for anything about the worker.') %></p><% } %>
     <table class="kv">
       <tr><th><%= t('Nationality') %></th><td><%= t(worker.nationality) %></td></tr>
       <tr><th><%= t('Profession') %></th><td><%= t(worker.profession) %> (<%= t('{n} years', { n: worker.experience_years }) %>)</td></tr>
@@ -13,12 +14,14 @@
       <tr><th><%= t('Date of birth') %></th><td><%= worker.date_of_birth ? fmtDate(worker.date_of_birth) : '—' %></td></tr>
       <tr><th><%= t('City') %></th><td><%= worker.city ? t(worker.city) : '—' %></td></tr>
       <tr><th><%= t('Skills') %></th><td><bdi><%= worker.skills || '—' %></bdi></td></tr>
+      <% if (showContact) { %>
       <tr><th><%= t('Phone') %></th><td dir="ltr"><a href="tel:<%= worker.phone %>"><%= worker.phone %></a></td></tr>
       <tr><th><%= t('Email') %></th><td dir="ltr"><a href="mailto:<%= worker.email %>"><%= worker.email %></a></td></tr>
-      <%- include('../partials/worker-extra-rows') %>
+      <% } %>
+      <%- include('partials/worker-extra-rows') %>
     </table>
     <% if (worker.work_history) { %><h3><%= t('Work history') %></h3><p class="prewrap" dir="auto"><%= worker.work_history %></p><% } %>
-    <% if (a.cover_note) { %><h3><%= t('Message from worker') %></h3><p class="prewrap" dir="auto"><bdi><%= a.cover_note %></bdi></p><% } %>
+    <% if (a.cover_note && showContact) { %><h3><%= t('Message from worker') %></h3><p class="prewrap" dir="auto"><bdi><%= a.cover_note %></bdi></p><% } %>
 
     <h3><%= t('Documents') %></h3>
     <% req.forEach(d => { if (!have.has(d)) { %><div class="alert alert-warn"><%= t('Missing required: {doc}', { doc: t(DOC_TYPES[d]) }) %></div><% } }) %>
@@ -32,12 +35,14 @@
       <% }) %>
     </div>
   </div>
+  <% if (locals.canDecide) { %>
   <aside class="card apply-box">
     <h2><%= t('Decision') %></h2>
     <% if (a.status === 'withdrawn') { %>
       <p class="muted"><%= t('The worker withdrew this application.') %></p>
     <% } else { %>
-    <form method="post" action="/company/applications/<%= a.id %>/status">
+    <p class="small muted"><%= t('Demand') %>: <bdi><%= a.company_name %></bdi></p>
+    <form method="post" action="/admin/applications/<%= a.id %>/status">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <label><%= t('Note to worker (optional)') %>
         <textarea name="company_note" rows="3" maxlength="1000" placeholder="<%= t('e.g. Report to site office on Sunday 7 AM') %>"><%= a.company_note || '' %></textarea>
@@ -48,5 +53,6 @@
     </form>
     <% } %>
   </aside>
+  <% } %>
 </div>
-<%- include('../partials/footer') %>
+<%- include('partials/footer') %>

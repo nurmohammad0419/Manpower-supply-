@@ -6,20 +6,23 @@
     <span class="tag"><%= t(demand.category) %></span>
     <% if (demand.status !== 'open') { %><span class="badge badge-rejected"><%= t('Closed') %></span><% } %>
     <h1><bdi><%= demand.title %></bdi></h1>
-    <p class="muted company-line"><%- include('partials/logo', { file: demand.logo_file }) %><bdi><%= demand.company_name %></bdi> · <%= t(demand.location_city) %><% if (demand.work_site) { %> — <bdi><%= demand.work_site %></bdi><% } %></p>
-    <div class="rate big"><strong><%= demand.salary_amount %> <%= t('SAR') %></strong> <%= t(SALARY_TYPES[demand.salary_type]) %></div>
+    <p class="muted company-line"><% if (demand.show_company) { %><%- include('partials/logo', { file: demand.logo_file }) %><bdi><%= demand.company_name %></bdi><% } else { %><%= t('Client company') %><% } %> · <%= t(demand.location_city) %><% if (demand.work_site) { %> — <bdi><%= demand.work_site %></bdi><% } %></p>
+    <div class="rate big"><strong><%= demand.worker_rate ?? '—' %> <%= t('SAR') %></strong> <%= t(SALARY_TYPES[demand.worker_rate_type] || '') %></div>
+    <p class="small muted"><%= t('You are employed through ManpowerHub KSA (the supply company), which pays your salary.') %></p>
 
     <table class="kv">
       <tr><th><%= t('Workers needed') %></th><td><%= demand.quantity %> <span class="muted">(<%= t('{n} hired', { n: demand.hired_count }) %>)</span></td></tr>
       <tr><th><%= t('Working hours') %></th><td><%= t('{h} hours/day, {d} days/week', { h: demand.hours_per_day, d: demand.days_per_week }) %></td></tr>
       <tr><th><%= t('Overtime') %></th><td><bdi><%= demand.overtime || '—' %></bdi></td></tr>
       <tr><th><%= t('Contract duration') %></th><td><bdi><%= demand.duration %></bdi></td></tr>
-      <tr><th><%= t('Food') %></th><td><%= yesNo(demand.food) %></td></tr>
-      <tr><th><%= t('Accommodation') %></th><td><%= yesNo(demand.accommodation) %></td></tr>
-      <tr><th><%= t('Transport') %></th><td><%= yesNo(demand.transport) %></td></tr>
+      <%- include('partials/worker-terms', { d: demand }) %>
       <tr><th><%= t('Start date') %></th><td><%= demand.start_date ? fmtDate(demand.start_date) : t('Immediate') %></td></tr>
       <tr><th><%= t('Apply before') %></th><td><%= demand.deadline ? fmtDate(demand.deadline) : t('Until filled') %></td></tr>
     </table>
+    <% if (demand.worker_terms) { %>
+      <h3><%= t('Terms and conditions') %></h3>
+      <p class="prewrap" dir="auto"><bdi><%= demand.worker_terms %></bdi></p>
+    <% } %>
     <% if (demand.requirements) { %>
       <h3><%= t('Requirements & details') %></h3>
       <p class="prewrap" dir="auto"><bdi><%= demand.requirements %></bdi></p>
@@ -29,14 +32,14 @@
       <% req.forEach(d => { %><li><%= t(DOC_TYPES[d]) %></li><% }) %>
       <% if (!req.length) { %><li class="muted"><%= t('No specific documents') %></li><% } %>
     </ul>
-    <p><a href="/demands/<%= demand.id %>/letter" target="_blank"><%= t('View printable demand letter') %> ↗</a></p>
+    <p><a href="/demands/<%= demand.id %>/letter" target="_blank"><%= t('View printable job offer') %> ↗</a></p>
   </div>
 
   <aside class="card apply-box">
     <% if (isOwner) { %>
       <h2><%= t('Your demand') %></h2>
-      <p><%= t('{n} applicant(s)', { n: demand.applicant_count }) %></p>
-      <a class="btn full" href="/company/demands/<%= demand.id %>"><%= t('Manage applicants') %></a>
+      <p class="muted"><%= t('This is how workers see the job post published by the admin.') %></p>
+      <a class="btn full" href="/company/demands/<%= demand.id %>"><%= t('Back to your demand') %></a>
     <% } else if (!user) { %>
       <h2><%= t('Apply for this job') %></h2>
       <p class="muted"><%= t('Log in or register as a worker to apply.') %></p>
@@ -62,7 +65,7 @@
             <% if (!has) { %><input type="file" name="doc_<%= d %>" accept=".pdf,image/*" required><% } %>
           </div>
         <% }) %>
-        <label><%= t('Message to company (optional)') %>
+        <label><%= t('Message to ManpowerHub KSA (optional)') %>
           <textarea name="cover_note" rows="3" maxlength="1000" placeholder="<%= t('e.g. I have 5 years experience, transferable Iqama, available immediately') %>"></textarea>
         </label>
         <button class="btn full"><%= t('Submit application') %></button>

@@ -14,13 +14,8 @@
   <form method="post" action="/company/timesheets" enctype="multipart/form-data" id="ts-form" data-rate="<%= demand.salary_amount %>" data-type="<%= demand.salary_type %>">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <input type="hidden" name="demand_id" value="<%= demand.id %>">
-    <div class="row3">
+    <div class="row2">
       <label><%= t('Month') %> * <input type="month" name="month" required value="<%= form.month || '' %>"></label>
-      <label><%= t('Payment method') %> *
-        <select name="payment_method" required>
-          <% Object.entries(PAYMENT_METHODS).forEach(([k, v]) => { %><option value="<%= k %>" <%= form.payment_method === k ? 'selected' : '' %>><%= t(v) %></option><% }) %>
-        </select>
-      </label>
       <label><%= t('Timesheet file (PDF or Excel)') %> <%= form.existing ? '' : '*' %>
         <input type="file" name="file" accept=".pdf,.xlsx,.xls,.csv" <%= form.existing ? '' : 'required' %>>
         <span class="hint"><%= form.existing ? t('Leave empty to keep the file you uploaded before.') : t('PDF, Excel (.xlsx, .xls) or CSV, max 10 MB.') %></span>
@@ -30,7 +25,7 @@
     <p class="hint"><%= t('The amount is calculated from the rate; you can change it. Leave a worker empty if they did not work this month.') %></p>
     <div class="table-wrap bordered">
       <table class="table">
-        <thead><tr><th><%= t('Worker') %></th><th><%= t('Days worked') %></th><th><%= t('Hours') %></th><th><%= t('Amount (SAR)') %></th></tr></thead>
+        <thead><tr><th><%= t('Worker') %></th><th><%= t('Days worked') %></th><th><%= t('Hours') %></th><th><%= t('Amount you owe (SAR)') %></th></tr></thead>
         <tbody>
         <% workers.forEach(w => { %>
           <tr class="ts-row">

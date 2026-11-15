@@ -58,9 +58,10 @@ const FIELD_TYPES = { text: 'Text', number: 'Number', date: 'Date', yesno: 'Yes 
 const TIMESHEET_STATUS = { submitted: 'Waiting for admin check', confirmed: 'Confirmed', rejected: 'Needs correction' };
 const PAYMENT_METHODS = { bank: 'Bank transfer', cash: 'Cash' };
 const PAYMENT_STATUS = { pending: 'Payment pending', paid: 'Paid' };
+const REVIEW_STATUS = { pending: 'Waiting for admin review', published: 'Published', rejected: 'Needs changes' };
 
 module.exports = {
   CATEGORIES, DOC_TYPES, CITIES, SALARY_TYPES, APP_STATUS, NATIONALITIES,
   KAFALA_OPTIONS, DRIVING_OPTIONS, NOTIFY_CHANNELS, FIELD_TYPES,
-  TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS,
+  TIMESHEET_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REVIEW_STATUS,
 };

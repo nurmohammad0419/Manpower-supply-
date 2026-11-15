@@ -28,6 +28,7 @@
           <a href="/worker/profile"><%= t('Profile') %></a>
         <% } else { %>
           <a href="/admin"><%= t('Admin') %></a>
+          <a href="/admin/demands" class="<%= path.startsWith('/admin/demands') ? 'active' : '' %>"><%= t('Demands') %></a>
           <a href="/admin/timesheets" class="<%= path.startsWith('/admin/timesheets') ? 'active' : '' %>"><%= t('Timesheets') %></a>
         <% } %>
         <form method="post" action="/logout" class="inline">

@@ -58,6 +58,23 @@ function startApp(env = {}) {
     }
   }
   ctx.Client = Client;
+
+  // Admin confirms the agreement with the company and publishes the job for workers.
+  ctx.publish = async (admin, demandId, overrides = {}) => {
+    const page = await admin.get('/admin/demands/' + demandId);
+    const val = (name) => (new RegExp(`name="${name}"[^>]*value="([^"]*)"`).exec(page.text) || [])[1];
+    const sel = (name) => (new RegExp(`<select name="${name}"[^>]*>[\\s\\S]*?value="(\\w+)" selected`).exec(page.text) || [])[1];
+    const fields = {
+      salary_amount: val('salary_amount'), salary_type: sel('salary_type') || 'hourly', client_payment_days: val('client_payment_days') || '30',
+      food: 'no', accommodation: 'no', transport: 'no',
+      worker_rate: '10', worker_rate_type: 'hourly', worker_pay_days: '7',
+      local_transport: '1', outside_accommodation: '1', outside_food: '1', worker_terms: '', agreement_signed: '1',
+      ...overrides,
+    };
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) if (v !== undefined && v !== null) fd.append(k, String(v));
+    return admin.post(`/admin/demands/${demandId}/publish`, fd, '/admin/demands/' + demandId);
+  };
   return ctx;
 }
 

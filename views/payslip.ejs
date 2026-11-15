@@ -4,7 +4,7 @@
 <body class="letter-body">
 <div class="letter">
   <div class="letter-head">
-    <div class="letter-company"><%- include('partials/logo', { file: ts.logo_file, size: 'lg' }) %><div><h1><bdi><%= ts.company_name %></bdi></h1><div>ManpowerHub KSA</div></div></div>
+    <div class="letter-company"><span class="logo lg-logo">MH</span><div><h1>ManpowerHub KSA</h1><div><%= t('Manpower supply company') %></div></div></div>
     <div class="right"><b><%= t('PAYMENT SLIP') %></b><br><%= t('Ref') %>: PS-<%= String(line.id).padStart(6, '0') %><br><%= t('Month') %>: <%= fmtMonth(ts.month) %></div>
   </div>
   <table class="letter-table">
@@ -12,10 +12,11 @@
     <tr><th><%= t('Iqama No.') %></th><td><%= worker.iqama_number || '—' %></td></tr>
     <tr><th><%= t('Nationality') %></th><td><%= t(worker.nationality) %></td></tr>
     <tr><th><%= t('Position') %></th><td><bdi><%= ts.demand_title %></bdi></td></tr>
-    <tr><th><%= t('Rate') %></th><td><%= ts.salary_amount %> <%= t('SAR') %> <%= t(SALARY_TYPES[ts.salary_type]) %></td></tr>
+    <tr><th><%= t('Work at') %></th><td><% if (ts.show_company) { %><bdi><%= ts.company_name %></bdi><% } else { %><%= t('Client company') %><% } %></td></tr>
+    <tr><th><%= t('Rate') %></th><td><%= ts.worker_rate ?? '—' %> <%= t('SAR') %> <%= t(SALARY_TYPES[ts.worker_rate_type] || '') %></td></tr>
     <tr><th><%= t('Days worked') %></th><td><%= line.days_worked %></td></tr>
     <tr><th><%= t('Hours') %></th><td><%= line.hours %></td></tr>
-    <tr class="total"><th><%= t('Amount (SAR)') %></th><td><b><%= money(line.amount) %></b></td></tr>
+    <tr class="total"><th><%= t('Amount (SAR)') %></th><td><b><%= money(line.pay) %></b></td></tr>
     <tr><th><%= t('Payment method') %></th><td><%= t(PAYMENT_METHODS[ts.payment_method]) %><% if (ts.payment_method === 'bank' && worker.iban) { %> — <bdi><%= worker.bank_name || '' %></bdi> <span dir="ltr"><%= worker.iban %></span><% } %></td></tr>
     <tr><th><%= t('Payment status') %></th><td><%= t(PAYMENT_STATUS[line.payment_status]) %><% if (line.paid_at) { %> · <%= fmtDate(line.paid_at) %><% } %></td></tr>
     <% if (line.payment_ref) { %><tr><th><%= t('Reference') %></th><td><bdi><%= line.payment_ref %></bdi></td></tr><% } %>

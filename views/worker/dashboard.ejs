@@ -15,9 +15,9 @@
     <tbody>
     <% applications.forEach(a => { %>
       <tr>
-        <td><a href="/demands/<%= a.demand_id %>"><b><bdi><%= a.title %></bdi></b></a><div class="small muted"><bdi><%= a.company_name %></bdi> · <%= t(a.location_city) %></div>
+        <td><a href="/demands/<%= a.demand_id %>"><b><bdi><%= a.title %></bdi></b></a><div class="small muted"><% if (a.show_company) { %><bdi><%= a.company_name %></bdi><% } else { %><%= t('Client company') %><% } %> · <%= t(a.location_city) %></div>
           <% if (a.company_note && a.status !== 'withdrawn') { %><div class="note">💬 <bdi><%= a.company_note %></bdi></div><% } %></td>
-        <td><%= a.salary_amount %> <%= t('SAR') %> <span class="small muted"><%= t(SALARY_TYPES[a.salary_type]) %></span></td>
+        <td><%= a.worker_rate ?? '—' %> <%= t('SAR') %> <span class="small muted"><%= t(SALARY_TYPES[a.worker_rate_type] || '') %></span></td>
         <td><span class="badge badge-<%= a.status %>"><%= t(APP_STATUS[a.status]) %></span></td>
         <td class="small"><%= fmtDate(a.updated_at) %></td>
         <td>

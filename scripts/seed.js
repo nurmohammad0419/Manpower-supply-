@@ -37,6 +37,11 @@ const seed = db.transaction(() => {
   const w = addUser.run('worker', 'demo.worker@manpower.local', '+966500000020', pw, 'Abdul Karim').lastInsertRowid;
   db.prepare(`INSERT INTO workers (user_id, full_name, nationality, iqama_number, passport_number, profession, experience_years, skills, city)
     VALUES (?,?,?,?,?,?,?,?,?)`).run(w, 'Abdul Karim', 'Bangladesh', '2456789012', 'EF1234567', 'Electrician', 6, 'Building wiring, panel boards; Arabic & Hindi', 'Riyadh');
+
+  // The admin has signed agreements with both companies and published the jobs, keeping a 20% margin.
+  db.prepare(`UPDATE demands SET review_status = 'published', agreement_signed = 1, published_at = datetime('now'),
+    worker_rate = ROUND(salary_amount * 0.8, 2), worker_rate_type = salary_type, worker_pay_days = 7, client_payment_days = 30
+    WHERE company_id IN (?, ?)`).run(c1, c2);
 });
 seed();
 

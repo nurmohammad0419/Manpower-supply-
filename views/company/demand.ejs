@@ -1,0 +1,55 @@
+<%- include('../partials/header') %>
+<div class="crumbs"><a href="/company"><span class="arr">←</span> <%= t('Dashboard') %></a></div>
+<div class="section-head">
+  <div>
+    <h1><bdi><%= demand.title %></bdi></h1>
+    <p class="muted"><%= t(demand.category) %> · <%= t(demand.location_city) %> · <%= t('{n} hrs/day', { n: demand.hours_per_day }) %></p>
+  </div>
+  <div class="actions">
+    <%- include('../partials/review-badge', { status: demand.review_status }) %>
+    <% if (demand.review_status !== 'published') { %><a class="btn btn-alt" href="/company/demands/<%= demand.id %>/edit"><%= t('Edit') %></a><% } else { %>
+      <a class="btn btn-alt" href="/demands/<%= demand.id %>"><%= t('View public page') %></a>
+      <a class="btn btn-alt" href="/company/timesheets"><%= t('Timesheets') %></a><% } %>
+    <form method="post" action="/company/demands/<%= demand.id %>/status" class="inline">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="status" value="<%= demand.status === 'open' ? 'closed' : 'open' %>">
+      <button class="btn <%= demand.status === 'open' ? 'btn-danger' : '' %>"><%= demand.status === 'open' ? t('Close demand') : t('Re-open') %></button>
+    </form>
+  </div>
+</div>
+<% if (demand.company_status !== 'approved') { %><div class="alert alert-warn"><%= t('Your company is awaiting admin verification. You can post demands now; they will be visible to workers once approved.') %></div><% } %>
+<% if (demand.review_status === 'pending') { %>
+  <div class="alert alert-warn"><%= t('ManpowerHub KSA is checking your demand. We will contact you to confirm the terms and sign the agreement, then publish the job.') %></div>
+<% } else if (demand.review_status === 'rejected') { %>
+  <div class="alert alert-error"><b><%= t('The admin asked for changes') %>:</b> <bdi><%= demand.admin_note %></bdi></div>
+<% } %>
+
+<div class="split">
+  <div class="card client-only">
+    <h2><%= t('Agreed terms') %></h2>
+    <table class="kv">
+      <tr><th><%= t('Rate you pay per worker') %></th><td><b><%= demand.salary_amount %> <%= t('SAR') %></b> <%= t(SALARY_TYPES[demand.salary_type]) %></td></tr>
+      <tr><th><%= t('You pay within') %></th><td><%= t('{n} days after month end', { n: demand.client_payment_days }) %></td></tr>
+      <tr><th><%= t('Workers needed') %></th><td><%= demand.quantity %></td></tr>
+      <tr><th><%= t('Working hours') %></th><td><%= t('{h} hours/day, {d} days/week', { h: demand.hours_per_day, d: demand.days_per_week }) %></td></tr>
+      <tr><th><%= t('Contract duration') %></th><td><bdi><%= demand.duration %></bdi></td></tr>
+      <tr><th><%= t('Food') %></th><td><%= yesNo(demand.food) %></td></tr>
+      <tr><th><%= t('Accommodation') %></th><td><%= yesNo(demand.accommodation) %></td></tr>
+      <tr><th><%= t('Transport') %></th><td><%= yesNo(demand.transport) %></td></tr>
+      <tr><th><%= t('Agreement') %></th><td>
+        <%= demand.agreement_signed ? t('Signed') : t('Not signed yet') %>
+        <% if (demand.agreement_file) { %> · <a href="/agreements/<%= demand.id %>" target="_blank"><%= t('Open agreement') %></a><% } %></td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h2><%= t('Workers assigned to you') %> (<%= workers.length %> / <%= demand.quantity %>)</h2>
+    <% if (!workers.length) { %><p class="muted"><%= t('No workers assigned yet. ManpowerHub KSA selects the workers and assigns them to you.') %></p><% } %>
+    <% workers.forEach(w => { %>
+      <div class="assigned">
+        <a href="/company/assigned/<%= w.application_id %>"><b><bdi><%= w.full_name %></bdi></b></a>
+        <div class="small muted"><%= t(w.profession) %> · <%= t(w.nationality) %> · <%= t('Iqama No.') %> <%= w.iqama_number || '—' %></div>
+      </div>
+    <% }) %>
+  </div>
+</div>
+<%- include('../partials/footer') %>

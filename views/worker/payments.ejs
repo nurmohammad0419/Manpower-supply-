@@ -15,10 +15,10 @@
     <% lines.forEach(l => { %>
       <tr>
         <td class="nowrap"><b><%= fmtMonth(l.month) %></b></td>
-        <td><div class="company-line"><%- include('../partials/logo', { file: l.logo_file, size: 'sm' }) %><bdi><%= l.company_name %></bdi></div><div class="small muted"><bdi><%= l.demand_title %></bdi></div></td>
+        <td><div class="company-line"><% if (l.show_company) { %><%- include('../partials/logo', { file: l.logo_file, size: 'sm' }) %><bdi><%= l.company_name %></bdi><% } else { %><%= t('Client company') %><% } %></div><div class="small muted"><bdi><%= l.demand_title %></bdi></div></td>
         <td><%= l.days_worked %></td>
         <td><%= l.hours %></td>
-        <td class="nowrap"><b><%= money(l.amount) %></b></td>
+        <td class="nowrap"><b><%= money(l.pay) %></b></td>
         <td><%= t(PAYMENT_METHODS[l.payment_method]) %><br><%- include('../partials/pay-badge', { status: l.payment_status }) %>
           <% if (l.paid_at) { %><div class="small muted"><%= fmtDate(l.paid_at) %></div><% } %></td>
         <td class="nowrap small"><a href="/payslips/<%= l.id %>" target="_blank"><%= t('Payment slip') %></a>
